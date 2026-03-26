@@ -144,7 +144,7 @@ function LoginPage() {
 
             {/* Links de ayuda */}
             <div className="help-links" style={{ justifyContent: 'space-between' }}>
-              <a href="#" className="help-link">¿Olvidaste tu contraseña?</a>
+              <Link to="/forgot-password" className="help-link">¿Olvidaste tu contraseña?</Link>
               <Link to="/register" className="help-link">Crear cuenta</Link>
             </div>
           </div>
