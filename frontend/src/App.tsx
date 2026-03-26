@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -14,13 +13,6 @@ function App() {
       </Routes>
     </BrowserRouter>
   )
-=======
-import LoginPage from './pages/LoginPage'
-import './App.css'
-
-function App() {
-  return <LoginPage />
->>>>>>> 57e5c82861ba9f697a953c69a0dec6a25e2937ad
 }
 
 export default App
