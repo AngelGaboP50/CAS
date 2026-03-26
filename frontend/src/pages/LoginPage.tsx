@@ -1,4 +1,8 @@
 import { useState } from 'react'
+<<<<<<< HEAD
+import { Link } from 'react-router-dom'
+=======
+>>>>>>> 57e5c82861ba9f697a953c69a0dec6a25e2937ad
 import './LoginPage.css'
 
 function LoginPage() {
@@ -142,8 +146,14 @@ function LoginPage() {
             </form>
 
             {/* Links de ayuda */}
+<<<<<<< HEAD
+            <div className="help-links" style={{ justifyContent: 'space-between' }}>
+              <a href="#" className="help-link">¿Olvidaste tu contraseña?</a>
+              <Link to="/register" className="help-link">Crear cuenta</Link>
+=======
             <div className="help-links">
               <a href="#" className="help-link">¿Olvidaste tu contraseña?</a>
+>>>>>>> 57e5c82861ba9f697a953c69a0dec6a25e2937ad
             </div>
           </div>
           {/* Bottom accent */}
