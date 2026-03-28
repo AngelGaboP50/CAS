@@ -1,30 +1,58 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import './LoginPage.css'
 
+const API_URL = 'http://localhost:8080/api/auth'
+
 function LoginPage() {
-  const [uid, setUid] = useState('')
+  const navigate = useNavigate()
+  const [correo, setCorreo] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: conectar al backend
-    console.log('Intento de inicio de sesión:', { uid, password })
+    setError('')
+    setLoading(true)
+
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ correo, password }),
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        sessionStorage.setItem('usuario', JSON.stringify({
+          id: data.userId,
+          nombre: data.nombre,
+          correo: data.correo,
+          tipo: data.tipo,
+        }))
+        navigate('/dashboard')
+      } else {
+        setError(data.message || 'Error al iniciar sesión')
+      }
+    } catch {
+      setError('No se pudo conectar con el servidor. Intenta más tarde.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleGoogleLogin = () => {
-    // TODO: implementar Google OAuth
     console.log('Inicio de sesión con Google iniciado')
   }
 
   return (
     <div className="login-root">
-      {/* Background glows */}
       <div className="bg-glow bg-glow-primary" />
       <div className="bg-glow bg-glow-secondary" />
 
-      {/* Header */}
       <header className="login-header">
         <div className="header-brand">
           <div className="brand-bar" />
@@ -35,9 +63,7 @@ function LoginPage() {
         </div>
       </header>
 
-      {/* Main */}
       <main className="login-main">
-        {/* Data stream decorations */}
         <div className="data-stream data-stream-right">
           <div className="ds-line ds-line-short" />
           <div className="ds-line ds-line-medium ds-align-right" />
@@ -51,38 +77,52 @@ function LoginPage() {
           <span className="ds-code ds-code-left">PROTOCOL-LEVEL-4</span>
         </div>
 
-        {/* Auth Card */}
         <div className="auth-card">
           <div className="auth-card-inner">
-            {/* Card Header */}
             <div className="card-header" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '12px', paddingBottom: '8px' }}>
               <span className="material-symbols-outlined" style={{ color: 'var(--color-secondary)', fontSize: '32px' }}>lock_open</span>
               <h2 className="card-title" style={{ fontSize: '26px', margin: 0 }}>Inicio de sesión</h2>
             </div>
 
-            {/* Form */}
+            {error && (
+              <div style={{
+                background: 'rgba(220, 53, 69, 0.15)',
+                border: '1px solid rgba(220, 53, 69, 0.5)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                color: '#ff6b7a',
+                fontSize: '14px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>error</span>
+                {error}
+              </div>
+            )}
+
             <form className="login-form" onSubmit={handleSubmit}>
-              {/* University ID */}
               <div className="field-group">
-                <label className="field-label" htmlFor="uid">
-                  ID Universitario
+                <label className="field-label" htmlFor="correo">
+                  Correo Institucional
                   <span className="field-required">Requerido</span>
                 </label>
                 <div className="input-wrapper">
                   <input
-                    id="uid"
-                    type="text"
+                    id="correo"
+                    type="email"
                     className="field-input"
-                    placeholder="Ingresa tu número de ID"
-                    value={uid}
-                    onChange={(e) => setUid(e.target.value)}
+                    placeholder="usuario@uteq.edu.mx"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
                     required
+                    disabled={loading}
                   />
                   <span className="material-symbols-outlined input-icon">person</span>
                 </div>
               </div>
 
-              {/* Contraseña */}
               <div className="field-group">
                 <label className="field-label" htmlFor="key">
                   Contraseña de Acceso
@@ -97,6 +137,7 @@ function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={loading}
                   />
                   <button
                     type="button"
@@ -111,26 +152,18 @@ function LoginPage() {
                 </div>
               </div>
 
-              {/* Botón principal */}
-              <button type="submit" className="btn-submit" id="btn-iniciar-sesion">
-                Iniciar Sesión
-                <span className="material-symbols-outlined icon-sm">arrow_forward</span>
+              <button type="submit" className="btn-submit" id="btn-iniciar-sesion" disabled={loading}>
+                {loading ? 'Verificando...' : 'Iniciar Sesión'}
+                {!loading && <span className="material-symbols-outlined icon-sm">arrow_forward</span>}
               </button>
 
-              {/* Divider */}
               <div className="divider">
                 <div className="divider-line" />
                 <span className="divider-text">O</span>
                 <div className="divider-line" />
               </div>
 
-              {/* Google Login */}
-              <button
-                type="button"
-                className="btn-google"
-                id="btn-google-login"
-                onClick={handleGoogleLogin}
-              >
+              <button type="button" className="btn-google" id="btn-google-login" onClick={handleGoogleLogin} disabled={loading}>
                 <svg className="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -142,18 +175,15 @@ function LoginPage() {
               </button>
             </form>
 
-            {/* Links de ayuda */}
             <div className="help-links" style={{ justifyContent: 'space-between' }}>
               <Link to="/forgot-password" className="help-link">¿Olvidaste tu contraseña?</Link>
               <Link to="/register" className="help-link">Crear cuenta</Link>
             </div>
           </div>
-          {/* Bottom accent */}
           <div className="card-bottom-accent" />
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="login-footer">
         <div className="footer-links"></div>
         <p className="footer-copy">© 2026 IDGS15 Equipo 6. TODOS LOS DERECHOS RESERVADOS.</p>

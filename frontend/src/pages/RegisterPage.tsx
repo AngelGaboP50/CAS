@@ -1,33 +1,69 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import './LoginPage.css' // Importamos los mismos estilos del login
+import { Link, useNavigate } from 'react-router-dom'
+import './LoginPage.css'
+
+const API_URL = 'http://localhost:8080/api/auth'
 
 function RegisterPage() {
-  const [name, setName] = useState('')
-  const [uid, setUid] = useState('')
+  const navigate = useNavigate()
+  const [nombre, setNombre] = useState('')
+  const [correo, setCorreo] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: conectar al backend para registro
-    console.log('Intento de registro:', { name, uid, password, confirmPassword })
+    setError('')
+    setSuccess('')
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const res = await fetch(`${API_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, correo, password, tipo: 'profesor' }),
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        setSuccess('¡Cuenta creada exitosamente! Redirigiendo al inicio de sesión...')
+        setTimeout(() => navigate('/login'), 2000)
+      } else {
+        setError(data.message || 'Error al crear la cuenta')
+      }
+    } catch {
+      setError('No se pudo conectar con el servidor. Intenta más tarde.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleGoogleRegister = () => {
-    // TODO: implementar registro con Google OAuth
     console.log('Registro con Google iniciado')
   }
 
   return (
     <div className="login-root">
-      {/* Background glows */}
       <div className="bg-glow bg-glow-primary" />
       <div className="bg-glow bg-glow-secondary" />
 
-      {/* Header */}
       <header className="login-header">
         <div className="header-brand">
           <div className="brand-bar" />
@@ -38,9 +74,7 @@ function RegisterPage() {
         </div>
       </header>
 
-      {/* Main */}
       <main className="login-main">
-        {/* Data stream decorations */}
         <div className="data-stream data-stream-right">
           <div className="ds-line ds-line-short" />
           <div className="ds-line ds-line-medium ds-align-right" />
@@ -54,58 +88,90 @@ function RegisterPage() {
           <span className="ds-code ds-code-left">PROTOCOL-LEVEL-4</span>
         </div>
 
-        {/* Auth Card */}
         <div className="auth-card">
           <div className="auth-card-inner">
-            {/* Card Header */}
             <div className="card-header" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '12px', paddingBottom: '8px' }}>
               <span className="material-symbols-outlined" style={{ color: 'var(--color-secondary)', fontSize: '32px' }}>person_add</span>
               <h2 className="card-title" style={{ fontSize: '26px', margin: 0 }}>Registrarse</h2>
             </div>
 
-            {/* Form */}
+            {error && (
+              <div style={{
+                background: 'rgba(220, 53, 69, 0.15)',
+                border: '1px solid rgba(220, 53, 69, 0.5)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                color: '#ff6b7a',
+                fontSize: '14px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>error</span>
+                {error}
+              </div>
+            )}
+
+            {success && (
+              <div style={{
+                background: 'rgba(25, 200, 100, 0.15)',
+                border: '1px solid rgba(25, 200, 100, 0.5)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                color: '#5ddf9a',
+                fontSize: '14px',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span>
+                {success}
+              </div>
+            )}
+
             <form className="login-form" onSubmit={handleSubmit}>
-              {/* Nombre */}
               <div className="field-group">
-                <label className="field-label" htmlFor="name">
+                <label className="field-label" htmlFor="nombre">
                   Nombre Completo
                   <span className="field-required">Requerido</span>
                 </label>
                 <div className="input-wrapper">
                   <input
-                    id="name"
+                    id="nombre"
                     type="text"
                     className="field-input"
                     placeholder="Ingresa tu nombre completo"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
                     required
+                    disabled={loading}
                   />
                   <span className="material-symbols-outlined input-icon">badge</span>
                 </div>
               </div>
 
-              {/* University ID */}
               <div className="field-group">
-                <label className="field-label" htmlFor="uid">
-                  ID Universitario
+                <label className="field-label" htmlFor="correo">
+                  Correo Institucional
                   <span className="field-required">Requerido</span>
                 </label>
                 <div className="input-wrapper">
                   <input
-                    id="uid"
-                    type="text"
+                    id="correo"
+                    type="email"
                     className="field-input"
-                    placeholder="Ingresa tu número de ID"
-                    value={uid}
-                    onChange={(e) => setUid(e.target.value)}
+                    placeholder="usuario@uteq.edu.mx"
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
                     required
+                    disabled={loading}
                   />
                   <span className="material-symbols-outlined input-icon">person</span>
                 </div>
               </div>
 
-              {/* Contraseña */}
               <div className="field-group">
                 <label className="field-label" htmlFor="key">
                   Contraseña de Acceso
@@ -120,6 +186,7 @@ function RegisterPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={loading}
                   />
                   <button
                     type="button"
@@ -134,7 +201,6 @@ function RegisterPage() {
                 </div>
               </div>
 
-              {/* Confirmar Contraseña */}
               <div className="field-group">
                 <label className="field-label" htmlFor="confirm-key">
                   Confirmar Contraseña
@@ -149,6 +215,7 @@ function RegisterPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
+                    disabled={loading}
                   />
                   <button
                     type="button"
@@ -163,26 +230,18 @@ function RegisterPage() {
                 </div>
               </div>
 
-              {/* Botón principal */}
-              <button type="submit" className="btn-submit" id="btn-registrarse">
-                Crear Cuenta
-                <span className="material-symbols-outlined icon-sm">person_add</span>
+              <button type="submit" className="btn-submit" id="btn-registrarse" disabled={loading}>
+                {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
+                {!loading && <span className="material-symbols-outlined icon-sm">person_add</span>}
               </button>
 
-              {/* Divider */}
               <div className="divider">
                 <div className="divider-line" />
                 <span className="divider-text">O</span>
                 <div className="divider-line" />
               </div>
 
-              {/* Google Register */}
-              <button
-                type="button"
-                className="btn-google"
-                id="btn-google-register"
-                onClick={handleGoogleRegister}
-              >
+              <button type="button" className="btn-google" id="btn-google-register" onClick={handleGoogleRegister} disabled={loading}>
                 <svg className="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -194,17 +253,14 @@ function RegisterPage() {
               </button>
             </form>
 
-            {/* Links de ayuda */}
             <div className="help-links" style={{ justifyContent: 'center' }}>
               <Link to="/login" className="help-link">¿Ya tienes una cuenta? Inicia sesión aquí</Link>
             </div>
           </div>
-          {/* Bottom accent */}
           <div className="card-bottom-accent" />
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="login-footer">
         <div className="footer-links"></div>
         <p className="footer-copy">© 2026 IDGS15 EQUIPO 6. TODOS LOS DERECHOS RESERVADOS.</p>
