@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Scanner } from '@yudiel/react-qr-scanner'
 import { supabase } from '../supabaseClient'
 import './DashboardPage.css'
 
@@ -23,6 +24,10 @@ function DashboardPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── NFC / QR modal state ─────────────────────────────────────────
+  const [nfcModalOpen, setNfcModalOpen] = useState(false)
+  const [qrData, setQrData] = useState<string | null>(null)
 
   useEffect(() => {
     if (!usuario) {
@@ -232,11 +237,11 @@ function DashboardPage() {
             <span className="dash-card-tag">Próximamente</span>
           </div>
 
-          <div className="dash-card">
+          <div className="dash-card dash-card--clickable" onClick={() => { setQrData(null); setNfcModalOpen(true); }} id="card-nfc">
             <span className="material-symbols-outlined dash-card-icon">nfc</span>
             <h3 className="dash-card-title">Tarjeta NFC</h3>
             <p className="dash-card-desc">Gestiona tu tarjeta NFC vinculada a tu cuenta.</p>
-            <span className="dash-card-tag">Próximamente</span>
+            <span className="dash-card-tag">Escanear QR</span>
           </div>
         </div>
       </main>
@@ -360,6 +365,56 @@ function DashboardPage() {
                 />
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de NFC / QR ── */}
+      {nfcModalOpen && (
+        <div
+          className="hor-overlay"
+          onClick={(e) => e.target === e.currentTarget && setNfcModalOpen(false)}
+          id="modal-nfc"
+        >
+          <div className="hor-modal">
+            {/* Header */}
+            <div className="hor-modal-header">
+              <div className="hor-modal-title-row">
+                <span className="material-symbols-outlined hor-modal-icon">qr_code_scanner</span>
+                <h2 className="hor-modal-title">Escanear Código QR</h2>
+              </div>
+              <button className="hor-close-btn" onClick={() => setNfcModalOpen(false)} id="btn-cerrar-modal-nfc">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="nfc-modal-body">
+              {qrData ? (
+                <div className="nfc-success-area">
+                  <span className="material-symbols-outlined nfc-success-icon">check_circle</span>
+                  <h3 className="nfc-success-title">¡Código Escaneado!</h3>
+                  <p className="nfc-success-data">{qrData}</p>
+                  <button className="nfc-scan-again-btn" onClick={() => setQrData(null)}>
+                    Escanear otro código
+                  </button>
+                </div>
+              ) : (
+                <div className="nfc-scanner-container">
+                  <p className="nfc-scanner-hint">Apunta tu cámara hacia el código QR</p>
+                  <div className="nfc-scanner-wrapper">
+                    <Scanner
+                      onScan={(result) => {
+                        if (result && result.length > 0) {
+                          setQrData(result[0].rawValue)
+                        }
+                      }}
+                      onError={(error) => console.log(error)}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
