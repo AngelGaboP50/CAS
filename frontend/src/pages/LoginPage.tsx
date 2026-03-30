@@ -44,7 +44,12 @@ function LoginPage() {
           correo: authData.user.email,
           tipo: userData?.tipo || 'indefinido',
         }))
-        navigate('/dashboard')
+        
+        if (userData?.tipo === 'admin') {
+          navigate('/admin')
+        } else {
+          navigate('/dashboard')
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión')

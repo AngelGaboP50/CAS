@@ -11,6 +11,8 @@ function DashboardPage() {
   useEffect(() => {
     if (!usuario) {
       navigate('/login', { replace: true })
+    } else if (usuario.tipo === 'admin') {
+      navigate('/admin', { replace: true })
     }
   }, [usuario, navigate])
 
