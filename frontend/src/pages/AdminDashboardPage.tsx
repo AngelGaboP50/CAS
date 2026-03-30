@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import './DashboardPage.css' // Reutilizamos los estilos del dashboard normal
+import { InteractiveMap } from '../components/InteractiveMap'
+import { useAulas, type EstadoAula } from '../hooks/useAulas'
 
 function AdminDashboardPage() {
   const navigate = useNavigate()
@@ -13,6 +15,7 @@ function AdminDashboardPage() {
 
   // Estado para las pestañas (Tabs del Sidebar)
   const [activeTab, setActiveTab] = useState<'principal' | 'usuarios' | 'perfil'>('principal')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // Estado para usuarios
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -30,6 +33,21 @@ function AdminDashboardPage() {
   const adminThemeColor = '#ff4d4f'
   const adminThemeGlow = 'rgba(255, 77, 79, 0.4)'
   const adminThemeBg = 'rgba(255, 77, 79, 0.15)'
+
+  // Hook para Aulas (Control de Salones)
+  const { aulas, updateEstadoAula } = useAulas()
+
+  const handleUpdateEstado = async (id: string, estadoActual: EstadoAula) => {
+    const estadosPermitidos: EstadoAula[] = ['LIBRE', 'EN_CLASE', 'ALERTA', 'EXCEPCION', 'NO_DISPONIBLE'];
+    const currentIndex = estadosPermitidos.indexOf(estadoActual);
+    const nextEstado = estadosPermitidos[(currentIndex + 1) % estadosPermitidos.length];
+    
+    try {
+      await updateEstadoAula(id, nextEstado);
+    } catch (err) {
+      alert('Error al actualizar el estado del salón');
+    }
+  }
 
   useEffect(() => {
     if (!usuario) {
@@ -120,8 +138,9 @@ function AdminDashboardPage() {
   const sidebarItemStyle = (isActive: boolean): React.CSSProperties => ({
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '12px 16px',
+    justifyContent: isSidebarOpen ? 'flex-start' : 'center',
+    gap: isSidebarOpen ? '12px' : '0',
+    padding: isSidebarOpen ? '12px 16px' : '12px 0',
     borderRadius: '12px',
     cursor: 'pointer',
     color: isActive ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
@@ -162,37 +181,55 @@ function AdminDashboardPage() {
         
         {/* SIDEBAR */}
         <aside style={{ 
-          width: '260px', 
+          width: isSidebarOpen ? '260px' : '80px', 
           borderRight: '1px solid var(--color-outline-variant)', 
           background: 'rgba(30, 31, 38, 0.4)', 
           backdropFilter: 'blur(10px)',
-          padding: '30px 20px', 
+          padding: isSidebarOpen ? '30px 20px' : '30px 10px', 
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '12px' 
+          gap: '12px',
+          transition: 'all 0.3s ease'
         }}>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+            style={{
+              background: 'transparent', border: 'none', color: 'var(--color-on-surface-variant)', 
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'flex-end' : 'center',
+              marginBottom: '16px', padding: '0 8px'
+            }}
+            title={isSidebarOpen ? "Contraer menú" : "Expandir menú"}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '24px', transition: 'color 0.2s' }}>
+              {isSidebarOpen ? 'menu_open' : 'menu'}
+            </span>
+          </button>
+
           <button 
             style={sidebarItemStyle(activeTab === 'principal')} 
             onClick={() => setActiveTab('principal')}
+            title="Principal"
           >
             <span className="material-symbols-outlined">dashboard</span>
-            Principal
+            {isSidebarOpen && <span>Principal</span>}
           </button>
           
           <button 
             style={sidebarItemStyle(activeTab === 'usuarios')} 
             onClick={() => { setActiveTab('usuarios'); fetchUsuarios(); }}
+            title="Usuarios"
           >
             <span className="material-symbols-outlined">group</span>
-            Usuarios
+            {isSidebarOpen && <span>Usuarios</span>}
           </button>
           
           <button 
             style={sidebarItemStyle(activeTab === 'perfil')} 
             onClick={() => setActiveTab('perfil')}
+            title="Perfil"
           >
             <span className="material-symbols-outlined">person</span>
-            Perfil
+            {isSidebarOpen && <span>Perfil</span>}
           </button>
         </aside>
 
@@ -219,55 +256,62 @@ function AdminDashboardPage() {
                   </div>
                 </div>
 
+                <InteractiveMap />
+
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', gap: '8px' }}>
                   <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)' }}>door_open</span>
-                  <h3 style={{ fontSize: '20px', margin: 0, fontWeight: 600 }}>Gestión de Salones</h3>
+                  <h3 style={{ fontSize: '20px', margin: 0, fontWeight: 600 }}>Control de Salones</h3>
                 </div>
 
                 <div className="dash-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
-                  {/* Card Salón 1 */}
-                  <div className="dash-card">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                      <span className="material-symbols-outlined dash-card-icon" style={{ color: 'var(--color-primary)', fontSize: '50px' }}>
-                        meeting_room
-                      </span>
-                      <span className="dash-badge" style={{ background: 'rgba(146,204,255,.1)', color: 'var(--color-primary)', border: 'none', margin: 0 }}>
-                        ACTIVO
-                      </span>
-                    </div>
-                    <h3 className="dash-card-title" style={{ fontSize: '22px' }}>Salón 1</h3>
-                    <p className="dash-card-desc">Control y monitoreo de accesos para el Salón 1. Revisa el historial, estado de la cerradura y gestiona permisos.</p>
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-                      <button className="dash-logout-btn" style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
-                        <span className="material-symbols-outlined">settings</span> Gestionar
-                      </button>
-                      <button className="dash-logout-btn" style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-outline-variant)' }}>
-                        <span className="material-symbols-outlined">history</span> Historial
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Card Salón 2 */}
-                  <div className="dash-card">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                      <span className="material-symbols-outlined dash-card-icon" style={{ color: 'var(--color-secondary)', fontSize: '50px' }}>
-                        meeting_room
-                      </span>
-                      <span className="dash-badge" style={{ background: 'rgba(74,225,131,.15)', color: 'var(--color-secondary)', border: 'none', margin: 0 }}>
-                        ACTIVO
-                      </span>
-                    </div>
-                    <h3 className="dash-card-title" style={{ fontSize: '22px' }}>Salón 2</h3>
-                    <p className="dash-card-desc">Control y monitoreo de accesos para el Salón 2. Revisa el historial, estado de la cerradura y gestiona permisos.</p>
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-                      <button className="dash-logout-btn" style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)' }}>
-                        <span className="material-symbols-outlined">settings</span> Gestionar
-                      </button>
-                      <button className="dash-logout-btn" style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-outline-variant)' }}>
-                        <span className="material-symbols-outlined">history</span> Historial
-                      </button>
-                    </div>
-                  </div>
+                  {aulas.length === 0 ? (
+                    <p style={{ color: 'var(--color-on-surface-variant)', gridColumn: '1 / -1' }}>No hay salones registrados en la base de datos o conectando...</p>
+                  ) : (
+                    aulas.map((aula) => (
+                      <div className="dash-card" key={aula.id}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                          <span className="material-symbols-outlined dash-card-icon" style={{ 
+                            color: aula.estado === 'NO_DISPONIBLE' ? 'var(--color-on-surface-variant)' : 
+                                   aula.estado === 'LIBRE' ? 'var(--color-secondary)' : 
+                                   aula.estado === 'EN_CLASE' ? 'var(--color-primary)' : 
+                                   '#ff6b7a', // alerta / excepcion
+                            fontSize: '50px' 
+                          }}>
+                            meeting_room
+                          </span>
+                          <span className="dash-badge" style={{ 
+                            background: aula.estado === 'NO_DISPONIBLE' ? 'rgba(255,255,255,0.05)' :
+                                        aula.estado === 'LIBRE' ? 'rgba(74,225,131,.15)' :
+                                        aula.estado === 'EN_CLASE' ? 'rgba(146,204,255,.1)' :
+                                        'rgba(255, 107, 122, 0.1)', 
+                            color: aula.estado === 'NO_DISPONIBLE' ? 'var(--color-on-surface-variant)' :
+                                   aula.estado === 'LIBRE' ? 'var(--color-secondary)' :
+                                   aula.estado === 'EN_CLASE' ? 'var(--color-primary)' :
+                                   '#ff6b7a',
+                            border: 'none', margin: 0 
+                          }}>
+                            {aula.estado.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <h3 className="dash-card-title" style={{ fontSize: '22px' }}>{aula.label.startsWith('Salón') ? aula.label : `Salón ${aula.label}`}</h3>
+                        <p className="dash-card-desc">Control local para este espacio. Revisa el historial de actividad y edita su estado actual.</p>
+                        
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                          <button 
+                            className="dash-logout-btn" 
+                            style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-outline-variant)' }}
+                            onClick={() => handleUpdateEstado(aula.id, aula.estado)}
+                            title="Cambiar Estado"
+                          >
+                            <span className="material-symbols-outlined">swap_horiz</span> Cambiar
+                          </button>
+                          <button className="dash-logout-btn" style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-outline-variant)' }}>
+                            <span className="material-symbols-outlined">history</span> Historial
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </>
             )}

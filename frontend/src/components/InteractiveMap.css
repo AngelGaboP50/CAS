@@ -1,0 +1,128 @@
+.svg-map-wrapper {
+  width: 100%;
+  height: 100%;
+  max-height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  padding: 0;
+  border: none;
+  overflow: visible; /* Prevent stroke clipping */
+}
+
+.interactive-svg-elem {
+  width: 100%;
+  height: 100%;
+  max-height: 500px;
+}
+
+.svg-map-content-group {
+  transition: transform 0.45s ease-in-out;
+}
+
+/* NODOS AULA */
+.svg-aula-node {
+  outline: none;
+}
+.svg-aula-node.clickable {
+  cursor: pointer;
+}
+.svg-aula-node.clickable:hover .svg-aula-rect {
+  filter: brightness(1.2);
+}
+
+.svg-aula-node:focus-visible .svg-aula-rect {
+  stroke: var(--color-on-surface);
+  stroke-width: 3px;
+}
+
+.svg-aula-rect {
+  transition: all 0.3s ease;
+  stroke-width: 2px;
+}
+
+/* Modificadores de Estado */
+.svg-aula-rect--NO_DISPONIBLE {
+  fill: transparent;
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-dasharray: 6 6;
+}
+
+.svg-aula-rect--LIBRE {
+  fill: #143022;
+  stroke: #22c55e;
+}
+
+.svg-aula-rect--EN_CLASE {
+  fill: #152636;
+  stroke: #3b82f6;
+}
+
+.svg-aula-rect--ALERTA {
+  fill: #341a1a;
+  stroke: #ef4444;
+}
+
+.svg-aula-rect--EXCEPCION {
+  fill: #362512;
+  stroke: #f59e0b;
+}
+
+/* TEXTOS AULA */
+.svg-aula-label {
+  fill: #ffffff;
+  font-size: 28px;
+  font-weight: 800;
+  font-family: inherit;
+  pointer-events: none;
+}
+.svg-aula-sublabel {
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.svg-text-state--LIBRE { fill: #22c55e; }
+.svg-text-state--EN_CLASE { fill: #3b82f6; }
+.svg-text-state--ALERTA { fill: #ef4444; }
+.svg-text-state--EXCEPCION { fill: #f59e0b; }
+.svg-text-state--NO_DISPONIBLE { fill: rgba(255, 255, 255, 0.4); }
+
+/* ESTATICOS */
+.svg-static-pasillo-dashed {
+  fill: transparent;
+  stroke: rgba(255, 255, 255, 0.05); /* very faint dashed outline */
+  stroke-width: 1.5px;
+  stroke-dasharray: 6 6;
+}
+
+.svg-static-dashed {
+  fill: transparent;
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1.5px;
+  stroke-dasharray: 6 6;
+}
+
+.svg-static-text {
+  fill: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+.svg-pasillo-text {
+  fill: rgba(255, 255, 255, 0.25);
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: 16px;
+  pointer-events: none;
+}
+
+.svg-aula-node g, .svg-map-content-group text {
+  transition: transform 0.45s ease-in-out;
+}
