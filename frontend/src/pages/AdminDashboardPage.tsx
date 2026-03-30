@@ -170,10 +170,6 @@ function AdminDashboardPage() {
             <p className="dash-brand-sub">Panel de Administración</p>
           </div>
         </div>
-        <button className="dash-logout-btn" onClick={handleLogout}>
-          <span className="material-symbols-outlined">logout</span>
-          Cerrar sesión
-        </button>
       </header>
 
       {/* Layout Principal con Sidebar */}
@@ -230,6 +226,27 @@ function AdminDashboardPage() {
           >
             <span className="material-symbols-outlined">person</span>
             {isSidebarOpen && <span>Perfil</span>}
+          </button>
+
+          <div style={{ flex: 1 }} /> {/* Espaciador de flexibilidad para empujar al fondo */}
+
+          <button 
+            style={{
+              ...sidebarItemStyle(false),
+            }}
+            onClick={handleLogout}
+            title="Cerrar sesión"
+            onMouseOver={e => {
+              e.currentTarget.style.color = '#ff6b7a';
+              e.currentTarget.style.background = 'rgba(255, 107, 122, 0.08)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.color = 'var(--color-on-surface-variant)';
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <span className="material-symbols-outlined">logout</span>
+            {isSidebarOpen && <span>Cerrar sesión</span>}
           </button>
         </aside>
 
