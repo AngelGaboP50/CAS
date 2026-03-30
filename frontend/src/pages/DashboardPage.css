@@ -210,3 +210,264 @@
   .dash-welcome-sub { justify-content: center; flex-wrap: wrap; }
   .dash-cards { grid-template-columns: 1fr; }
 }
+
+/* ─── Clickable card variant ─────────────────────────────────── */
+.dash-card--clickable {
+  cursor: pointer;
+}
+.dash-card--clickable:hover {
+  border-color: rgba(146,204,255,.5);
+  background: var(--color-surface-container-high);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(146,204,255,.08);
+}
+
+/* Active tag variant (horario cargado) */
+.dash-card-tag--active {
+  background: rgba(74,225,131,.15);
+  color: var(--color-secondary);
+  border-color: rgba(74,225,131,.3);
+}
+
+/* ─── Horario Modal Overlay ──────────────────────────────────── */
+.hor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn .18s ease;
+  padding: 20px;
+  box-sizing: border-box;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ─── Modal Card ─────────────────────────────────────────────── */
+.hor-modal {
+  background: var(--color-surface-container);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp .22s ease;
+  box-shadow: 0 24px 60px rgba(0,0,0,.5);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Modal Header ───────────────────────────────────────────── */
+.hor-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--color-outline-variant);
+}
+.hor-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.hor-modal-icon {
+  font-size: 26px;
+  color: var(--color-primary);
+}
+.hor-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-on-surface);
+  margin: 0;
+  letter-spacing: .3px;
+}
+.hor-close-btn {
+  background: transparent;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 8px;
+  color: var(--color-on-surface-variant);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  transition: all .2s;
+}
+.hor-close-btn:hover {
+  border-color: #ff6b7a;
+  color: #ff6b7a;
+  background: rgba(255,107,122,.08);
+}
+.hor-close-btn .material-symbols-outlined { font-size: 20px; }
+
+/* ─── Upload Area ────────────────────────────────────────────── */
+.hor-upload-area { padding: 28px; }
+.hor-drop-zone {
+  border: 2px dashed var(--color-outline-variant);
+  border-radius: 14px;
+  padding: 52px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color .2s, background .2s;
+  background: rgba(146,204,255,.02);
+}
+.hor-drop-zone:hover,
+.hor-drop-zone--active {
+  border-color: var(--color-primary);
+  background: rgba(146,204,255,.06);
+}
+.hor-upload-icon {
+  font-size: 52px;
+  color: var(--color-primary);
+  opacity: .75;
+}
+.hor-drop-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  margin: 0;
+}
+.hor-drop-sub {
+  font-size: 13px;
+  color: var(--color-on-surface-variant);
+  margin: 0;
+}
+.hor-format-tag {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  padding: 3px 12px;
+  border-radius: 20px;
+  background: rgba(146,204,255,.1);
+  color: var(--color-primary);
+  border: 1px solid rgba(146,204,255,.2);
+}
+
+/* ─── Preview Area ───────────────────────────────────────────── */
+.hor-preview-area {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hor-preview-img {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--color-outline-variant);
+  object-fit: contain;
+  max-height: 420px;
+  background: rgba(0,0,0,.3);
+}
+
+/* ─── Actions Row ────────────────────────────────────────────── */
+.hor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.hor-hint {
+  font-size: 13px;
+  color: var(--color-on-surface-variant);
+  margin: 0;
+}
+.hor-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,107,122,.4);
+  background: rgba(255,107,122,.08);
+  color: #ff6b7a;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+}
+.hor-delete-btn:hover {
+  background: rgba(255,107,122,.16);
+  border-color: #ff6b7a;
+}
+.hor-delete-btn .material-symbols-outlined { font-size: 18px; }
+
+/* ─── Delete Confirm ─────────────────────────────────────────── */
+.hor-confirm-area {
+  padding: 20px;
+  border-radius: 12px;
+  background: rgba(255,107,122,.05);
+  border: 1px solid rgba(255,107,122,.2);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hor-confirm-text {
+  font-size: 14px;
+  color: var(--color-on-surface-variant);
+  margin: 0;
+  line-height: 1.5;
+}
+.hor-confirm-btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hor-cancel-btn {
+  padding: 9px 22px;
+  border-radius: 9px;
+  border: 1px solid var(--color-outline-variant);
+  background: transparent;
+  color: var(--color-on-surface-variant);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .2s;
+  flex: 1;
+}
+.hor-cancel-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.hor-confirm-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 22px;
+  border-radius: 9px;
+  border: none;
+  background: linear-gradient(135deg, #ff6b7a, #e84393);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .2s, transform .15s;
+  flex: 1;
+}
+.hor-confirm-delete-btn:hover {
+  opacity: .88;
+  transform: translateY(-1px);
+}
+.hor-confirm-delete-btn .material-symbols-outlined { font-size: 18px; }
+
+/* ─── Responsive Modal ───────────────────────────────────────── */
+@media (max-width: 600px) {
+  .hor-modal-header { padding: 18px 20px 16px; }
+  .hor-upload-area  { padding: 20px; }
+  .hor-drop-zone    { padding: 36px 20px; }
+  .hor-preview-area { padding: 18px 20px; }
+  .hor-actions      { flex-direction: column; align-items: flex-start; }
+}
