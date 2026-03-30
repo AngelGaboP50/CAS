@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './LoginPage.css'
 
-const API_URL = 'http://localhost:8080/api/auth'
-
+import { supabase } from '../supabaseClient'
 function LoginPage() {
   const navigate = useNavigate()
   const [correo, setCorreo] = useState('')
@@ -18,27 +17,37 @@ function LoginPage() {
     setLoading(true)
 
     try {
-      const res = await fetch(`${API_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ correo, password }),
+      // 1. Iniciar sesión usando Supabase Auth (verifica la contraseña)
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: correo,
+        password: password,
       })
 
-      const data = await res.json()
+      if (authError) throw authError
 
-      if (data.success) {
+      // 2. Traemos la información adicional del usuario (rol, nombre) desde la tabla pública
+      if (authData.user) {
+        const { data: userData, error: dbError } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('correo', correo)
+          .single()
+
+        if (dbError) {
+          // Si no encontramos el usuario en nuestra tabla, igual lo dejamos pasar pero con datos por defecto o tiramos error
+          console.warn('Usuario no encontrado en la tabla pública usuarios')
+        }
+
         sessionStorage.setItem('usuario', JSON.stringify({
-          id: data.userId,
-          nombre: data.nombre,
-          correo: data.correo,
-          tipo: data.tipo,
+          id: userData?.id || authData.user.id,
+          nombre: userData?.nombre || 'Usuario',
+          correo: authData.user.email,
+          tipo: userData?.tipo || 'indefinido',
         }))
         navigate('/dashboard')
-      } else {
-        setError(data.message || 'Error al iniciar sesión')
       }
-    } catch {
-      setError('No se pudo conectar con el servidor. Intenta más tarde.')
+    } catch (err: any) {
+      setError(err.message || 'Error al iniciar sesión')
     } finally {
       setLoading(false)
     }

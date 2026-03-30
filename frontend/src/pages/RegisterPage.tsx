@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './LoginPage.css'
 
-const API_URL = 'http://localhost:8080/api/auth'
-
+import { supabase } from '../supabaseClient'
 function RegisterPage() {
   const navigate = useNavigate()
   const [nombre, setNombre] = useState('')
@@ -34,29 +33,42 @@ function RegisterPage() {
     setLoading(true)
 
     try {
-      const res = await fetch(`${API_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, correo, password, tipo: 'profesor' }),
+      // 1. Registrar el usuario en supabase auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: correo,
+        password: password,
       })
 
-      const data = await res.json()
+      if (authError) throw authError
 
-      if (data.success) {
+      // 2. Si se creó el usuario en Auth, insertamos su perfil en nuestra tabla pública 'usuarios'
+      if (authData.user) {
+        const { error: dbError } = await supabase
+          .from('usuarios')
+          .insert([
+            {
+              nombre: nombre,
+              correo: correo,
+              tipo: 'profesor' // Valor predeterminado según el enum del script
+            }
+          ])
+        
+        if (dbError) throw dbError
+
         setSuccess('¡Cuenta creada exitosamente! Redirigiendo al inicio de sesión...')
         setTimeout(() => navigate('/login'), 2000)
-      } else {
-        setError(data.message || 'Error al crear la cuenta')
       }
-    } catch {
-      setError('No se pudo conectar con el servidor. Intenta más tarde.')
+    } catch (err: any) {
+      setError(err.message || 'Error al crear la cuenta')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleGoogleRegister = () => {
-    console.log('Registro con Google iniciado')
+  const handleGoogleRegister = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    })
   }
 
   return (
