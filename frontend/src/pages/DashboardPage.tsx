@@ -1,21 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../supabaseClient'
 import './DashboardPage.css'
+
+const BUCKET = 'files'
+const HORARIOS_FOLDER = 'imagenes'
 
 function DashboardPage() {
   const navigate = useNavigate()
 
   const usuarioRaw = sessionStorage.getItem('usuario')
-  const usuario = usuarioRaw ? JSON.parse(usuarioRaw) : null
+  const usuario = useMemo(() => usuarioRaw ? JSON.parse(usuarioRaw) : null, [usuarioRaw])
+  const userId = usuario?.id
 
-  // ── Horario modal state ──────────────────────────────────────
+  // ── Horario modal state ──────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false)
-  const [horarioImg, setHorarioImg] = useState<string | null>(() => {
-    if (!usuario) return null
-    return localStorage.getItem(`horario_${usuario.id}`) ?? null
-  })
+  const [horarioUrl, setHorarioUrl] = useState<string | null>(null)
+  const [loadingHorario, setLoadingHorario] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -26,30 +32,95 @@ function DashboardPage() {
     }
   }, [usuario, navigate])
 
+  // ── Cargar horario existente desde Supabase ──────────────────────
+  const fetchHorario = useCallback(async () => {
+    if (!userId) return
+    setLoadingHorario(true)
+    setErrorMsg(null)
+    try {
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .list(`${HORARIOS_FOLDER}/${userId}`, { limit: 5 })
+
+      if (error) throw error
+
+      // Buscar archivo con nombre "horario.*"
+      const archivo = data?.find(f => f.name.startsWith('horario.'))
+      if (archivo) {
+        const { data: urlData } = supabase.storage
+          .from(BUCKET)
+          .getPublicUrl(`${HORARIOS_FOLDER}/${userId}/${archivo.name}`)
+        // Agregar timestamp para evitar caché
+        setHorarioUrl(`${urlData.publicUrl}?t=${Date.now()}`)
+      } else {
+        setHorarioUrl(null)
+      }
+    } catch (err: any) {
+      setErrorMsg('No se pudo cargar el horario. Intenta de nuevo.')
+      console.error(err)
+    } finally {
+      setLoadingHorario(false)
+    }
+  }, [userId])
+
+  // Cargar al abrir el modal
+  useEffect(() => {
+    if (modalOpen) fetchHorario()
+  }, [modalOpen, fetchHorario])
+
   const handleLogout = () => {
     sessionStorage.removeItem('usuario')
     navigate('/login', { replace: true })
   }
 
-  // ── Horario helpers ──────────────────────────────────────────
+  // ── Modal helpers ────────────────────────────────────────────────
   const openModal = () => {
     setDeleteConfirm(false)
+    setErrorMsg(null)
     setModalOpen(true)
   }
   const closeModal = () => {
+    if (uploading || deleting) return
     setDeleteConfirm(false)
+    setErrorMsg(null)
     setModalOpen(false)
   }
 
-  const handleFileSelect = (file: File) => {
-    if (!file.type.startsWith('image/')) return
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string
-      setHorarioImg(dataUrl)
-      localStorage.setItem(`horario_${usuario.id}`, dataUrl)
+  // ── Subir horario a Supabase Storage ────────────────────────────
+  const handleFileSelect = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Solo se permiten imágenes PNG o JPG.')
+      return
     }
-    reader.readAsDataURL(file)
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMsg('El archivo no puede superar los 10 MB.')
+      return
+    }
+
+    setErrorMsg(null)
+    setUploading(true)
+
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const path = `${HORARIOS_FOLDER}/${usuario.id}/horario.${ext}`
+
+      // upsert: sobreescribe si ya existe (no debería llegar aquí con uno cargado,
+      // pero como salvaguarda lo dejamos en upsert)
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, file, { upsert: true, contentType: file.type })
+
+      if (error) throw error
+
+      await fetchHorario()
+    } catch (err: any) {
+      setErrorMsg('Error al subir el archivo. Verifica los permisos del bucket.')
+      console.error(err)
+    } finally {
+      setUploading(false)
+      // Limpiar el input para poder seleccionar el mismo archivo otra vez
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,10 +135,38 @@ function DashboardPage() {
     if (file) handleFileSelect(file)
   }
 
-  const handleDeleteHorario = () => {
-    setHorarioImg(null)
-    localStorage.removeItem(`horario_${usuario.id}`)
-    setDeleteConfirm(false)
+  // ── Eliminar horario de Supabase Storage ────────────────────────
+  const handleDeleteHorario = async () => {
+    if (!horarioUrl) return
+    setDeleting(true)
+    setErrorMsg(null)
+
+    try {
+      // Listar y borrar todos los archivos dentro de la carpeta del usuario
+      const { data, error: listErr } = await supabase.storage
+        .from(BUCKET)
+        .list(`${HORARIOS_FOLDER}/${usuario.id}`)
+
+      if (listErr) throw listErr
+
+      const paths = (data ?? []).map(
+        f => `${HORARIOS_FOLDER}/${usuario.id}/${f.name}`
+      )
+      if (paths.length > 0) {
+        const { error: removeErr } = await supabase.storage
+          .from(BUCKET)
+          .remove(paths)
+        if (removeErr) throw removeErr
+      }
+
+      setHorarioUrl(null)
+      setDeleteConfirm(false)
+    } catch (err: any) {
+      setErrorMsg('Error al eliminar el horario. Intenta de nuevo.')
+      console.error(err)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (!usuario) return null
@@ -121,10 +220,9 @@ function DashboardPage() {
             <span className="material-symbols-outlined dash-card-icon">calendar_month</span>
             <h3 className="dash-card-title">Mis Horarios</h3>
             <p className="dash-card-desc">Visualiza tus horarios asignados por salón y día.</p>
-            {horarioImg
-              ? <span className="dash-card-tag dash-card-tag--active">Ver horario</span>
-              : <span className="dash-card-tag">Subir horario</span>
-            }
+            <span className={`dash-card-tag${horarioUrl ? ' dash-card-tag--active' : ''}`}>
+              {horarioUrl ? 'Ver horario' : 'Subir horario'}
+            </span>
           </div>
 
           <div className="dash-card">
@@ -149,7 +247,11 @@ function DashboardPage() {
 
       {/* ── Modal de Horario ── */}
       {modalOpen && (
-        <div className="hor-overlay" onClick={(e) => e.target === e.currentTarget && closeModal()} id="modal-horario">
+        <div
+          className="hor-overlay"
+          onClick={(e) => e.target === e.currentTarget && closeModal()}
+          id="modal-horario"
+        >
           <div className="hor-modal">
             {/* Header */}
             <div className="hor-modal-header">
@@ -157,16 +259,30 @@ function DashboardPage() {
                 <span className="material-symbols-outlined hor-modal-icon">calendar_month</span>
                 <h2 className="hor-modal-title">Mis Horarios</h2>
               </div>
-              <button className="hor-close-btn" onClick={closeModal} id="btn-cerrar-modal-horario">
+              <button className="hor-close-btn" onClick={closeModal} id="btn-cerrar-modal-horario" disabled={uploading || deleting}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
+            {/* Error */}
+            {errorMsg && (
+              <div className="hor-error-banner">
+                <span className="material-symbols-outlined">error</span>
+                {errorMsg}
+              </div>
+            )}
+
             {/* Body */}
-            {horarioImg ? (
+            {loadingHorario ? (
+              /* ── Cargando ── */
+              <div className="hor-loading-area">
+                <div className="hor-spinner" />
+                <p className="hor-loading-text">Cargando horario...</p>
+              </div>
+            ) : horarioUrl ? (
               /* ── Vista de horario cargado ── */
               <div className="hor-preview-area">
-                <img src={horarioImg} alt="Mi horario" className="hor-preview-img" id="img-horario-preview" />
+                <img src={horarioUrl} alt="Mi horario" className="hor-preview-img" id="img-horario-preview" />
 
                 {!deleteConfirm ? (
                   <div className="hor-actions">
@@ -184,12 +300,25 @@ function DashboardPage() {
                   <div className="hor-confirm-area">
                     <p className="hor-confirm-text">¿Estás seguro de que deseas eliminar tu horario? Esta acción no se puede deshacer.</p>
                     <div className="hor-confirm-btns">
-                      <button className="hor-cancel-btn" onClick={() => setDeleteConfirm(false)} id="btn-cancelar-eliminar">
+                      <button
+                        className="hor-cancel-btn"
+                        onClick={() => setDeleteConfirm(false)}
+                        id="btn-cancelar-eliminar"
+                        disabled={deleting}
+                      >
                         Cancelar
                       </button>
-                      <button className="hor-confirm-delete-btn" onClick={handleDeleteHorario} id="btn-confirmar-eliminar">
-                        <span className="material-symbols-outlined">delete_forever</span>
-                        Sí, eliminar
+                      <button
+                        className="hor-confirm-delete-btn"
+                        onClick={handleDeleteHorario}
+                        id="btn-confirmar-eliminar"
+                        disabled={deleting}
+                      >
+                        {deleting ? (
+                          <><div className="hor-btn-spinner" />Eliminando...</>
+                        ) : (
+                          <><span className="material-symbols-outlined">delete_forever</span>Sí, eliminar</>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -199,17 +328,27 @@ function DashboardPage() {
               /* ── Área de subida ── */
               <div className="hor-upload-area">
                 <div
-                  className={`hor-drop-zone ${dragOver ? 'hor-drop-zone--active' : ''}`}
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                  className={`hor-drop-zone${dragOver ? ' hor-drop-zone--active' : ''}${uploading ? ' hor-drop-zone--uploading' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); if (!uploading) setDragOver(true) }}
                   onDragLeave={() => setDragOver(false)}
                   onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => !uploading && fileInputRef.current?.click()}
                   id="drop-zone-horario"
                 >
-                  <span className="material-symbols-outlined hor-upload-icon">upload_file</span>
-                  <p className="hor-drop-title">Arrastra tu horario aquí</p>
-                  <p className="hor-drop-sub">o haz clic para seleccionar un archivo</p>
-                  <span className="hor-format-tag">PNG · JPG · JPEG</span>
+                  {uploading ? (
+                    <>
+                      <div className="hor-spinner" />
+                      <p className="hor-drop-title">Subiendo horario...</p>
+                      <p className="hor-drop-sub">Por favor espera</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined hor-upload-icon">upload_file</span>
+                      <p className="hor-drop-title">Arrastra tu horario aquí</p>
+                      <p className="hor-drop-sub">o haz clic para seleccionar un archivo</p>
+                      <span className="hor-format-tag">PNG · JPG · JPEG · máx. 10 MB</span>
+                    </>
+                  )}
                 </div>
                 <input
                   ref={fileInputRef}
