@@ -17,10 +17,6 @@
   max-height: 500px;
 }
 
-.svg-map-content-group {
-  transition: transform 0.45s ease-in-out;
-}
-
 /* NODOS AULA */
 .svg-aula-node {
   outline: none;
@@ -123,6 +119,3 @@
   pointer-events: none;
 }
 
-.svg-aula-node g, .svg-map-content-group text {
-  transition: transform 0.45s ease-in-out;
-}

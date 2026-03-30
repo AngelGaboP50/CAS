@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import './InteractiveMap.css';
 import { useAulas } from '../hooks/useAulas';
 
@@ -29,8 +29,6 @@ const colX = (col: number) => col * (AULA_W + GAP_X);
 
 const TOTAL_WIDTH = colX(6) + AULA_W; 
 const TOTAL_HEIGHT = row3Y + AULA_H;
-const CX = TOTAL_WIDTH / 2;
-const CY = TOTAL_HEIGHT / 2;
 
 const AULAS: AulaDesc[] = [
   // Fila Superior
@@ -48,9 +46,8 @@ const AULAS: AulaDesc[] = [
 ];
 
 export const InteractiveMap: React.FC = () => {
-  const [rotation, setRotation] = useState<number>(0);
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
-  const [viewBoxStr, setViewBoxStr] = useState<string>(`0 0 ${TOTAL_WIDTH} ${TOTAL_HEIGHT}`);
+  const PADDING = 20;
+  const viewBoxStr = `${-PADDING} ${-PADDING} ${TOTAL_WIDTH + PADDING * 2} ${TOTAL_HEIGHT + PADDING * 2}`;
 
   const { aulas: aulasRemotas } = useAulas();
 
@@ -62,58 +59,6 @@ export const InteractiveMap: React.FC = () => {
     }
     return aulaEstatica;
   });
-
-  // Helpers para calcular variables del contenedor para absorber colisión de áreas (Bounding Box y Pitágoras)
-  useEffect(() => {
-    const PADDING = 20; // Padding to avoid border clipping during strokes
-    if (isTransitioning) {
-      // Uso de Pitágoras para la zona segura durante transición (Caja Segura)
-      const maxDim = Math.sqrt(TOTAL_WIDTH ** 2 + TOTAL_HEIGHT ** 2);
-      const minX = CX - maxDim / 2;
-      const minY = CY - maxDim / 2;
-      setViewBoxStr(`${minX - PADDING} ${minY - PADDING} ${maxDim + PADDING * 2} ${maxDim + PADDING * 2}`);
-    } else {
-      // Uso Funcionalidad con Bounding Box exacto al reposar usando sen/cos
-      const rad = rotation * (Math.PI / 180);
-      const absCos = Math.abs(Math.cos(rad));
-      const absSin = Math.abs(Math.sin(rad));
-      
-      const newWidth = TOTAL_WIDTH * absCos + TOTAL_HEIGHT * absSin;
-      const newHeight = TOTAL_WIDTH * absSin + TOTAL_HEIGHT * absCos;
-      
-      const minX = CX - newWidth / 2;
-      const minY = CY - newHeight / 2;
-      
-      setViewBoxStr(`${minX - PADDING} ${minY - PADDING} ${newWidth + PADDING * 2} ${newHeight + PADDING * 2}`);
-    }
-  }, [rotation, isTransitioning]);
-
-  const handleRotate = (angleChange: number) => {
-    setIsTransitioning(true);
-    let newRotation = (rotation + angleChange) % 360;
-    if (newRotation < 0) newRotation += 360;
-    
-    setRotation(newRotation);
-    setTimeout(() => {
-      setIsTransitioning(false);
-    }, 450); // Mismo tiempo que dura la transición CSS
-  };
-
-  const handleSetRotation = (exactAngle: number) => {
-    setIsTransitioning(true);
-    setRotation(exactAngle);
-    setTimeout(() => {
-      setIsTransitioning(false);
-    }, 450); 
-  };
-
-  // Preservación de un sistema de contra-rotación sobre textos para que su orientación visual quede inalterada pese a la rotación
-  const textRotateTransform = (rectX: number, rectY: number, rectW: number, rectH: number) => {
-    const textCenterX = rectX + rectW / 2;
-    const textCenterY = rectY + rectH / 2;
-    return `rotate(${-rotation}, ${textCenterX}, ${textCenterY})`;
-  };
-
   const renderAula = (aula: AulaDesc) => {
     const classMod = `svg-aula-rect--${aula.estado}`;
     const cx = aula.x + aula.w / 2;
@@ -137,7 +82,7 @@ export const InteractiveMap: React.FC = () => {
         />
         
         {/* Helper Group For Centered Text Setup */}
-        <g transform={textRotateTransform(aula.x, aula.y, aula.w, aula.h)}>
+        <g>
             <text x={cx} y={cy - 8} className="svg-aula-label" textAnchor="middle" dominantBaseline="middle">
               {aula.label}
             </text>
@@ -156,18 +101,6 @@ export const InteractiveMap: React.FC = () => {
     <div className="map-container" style={{ margin: '0 0 40px 0', background: 'transparent', border: 'none', padding: 0 }}>
       <div className="map-header" style={{ marginBottom: '20px' }}>
         <h3 className="map-title" style={{ fontSize: '22px', fontWeight: 600 }}>Mapa del edificio</h3>
-        <div className="map-header-right">
-          <div className="map-controls">
-            <button className={`map-btn ${rotation === 0 ? 'active' : ''}`} onClick={() => handleSetRotation(0)}>0°</button>
-            <button className={`map-btn ${rotation === 90 ? 'active' : ''}`} onClick={() => handleSetRotation(90)}>90°</button>
-            <button className={`map-btn ${rotation === 180 ? 'active' : ''}`} onClick={() => handleSetRotation(180)}>180°</button>
-            <button className={`map-btn ${rotation === 270 ? 'active' : ''}`} onClick={() => handleSetRotation(270)}>270°</button>
-            
-            <button className="map-btn" onClick={() => handleRotate(90)} style={{ marginLeft: '12px', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>rotate_right</span> Rotar
-            </button>
-          </div>
-        </div>
       </div>
 
       <div className="svg-map-wrapper">
@@ -177,13 +110,7 @@ export const InteractiveMap: React.FC = () => {
           className="interactive-svg-elem"
         >
           {/* El grupo contenedor que maneja la transformación */}
-          <g 
-            className="svg-map-content-group"
-            style={{ 
-              transform: `rotate(${rotation}deg)`, 
-              transformOrigin: `${CX}px ${CY}px` 
-            }}
-          >
+          <g className="svg-map-content-group">
             {/* --------- CAPA ESTÁTICA DEL MAPA --------- */}
             
             {/* Pasillo central */}
@@ -194,7 +121,6 @@ export const InteractiveMap: React.FC = () => {
             <text 
               x={TOTAL_WIDTH / 2} y={row2Y + PASILLO_H / 2} 
               className="svg-pasillo-text" textAnchor="middle" dominantBaseline="middle"
-              transform={textRotateTransform(0, row2Y, TOTAL_WIDTH, PASILLO_H)}
             >
               PASILLO
             </text>
@@ -202,17 +128,17 @@ export const InteractiveMap: React.FC = () => {
             {/* Oficinas y Escaleras - Superiores (Indices 4, 5, 6) */}
             <g>
                 <rect x={colX(4)} y={row1Y} width={AULA_W} height={AULA_H} rx={8} className="svg-static-dashed" />
-                <text x={colX(4) + AULA_W/2} y={row1Y + AULA_H/2} className="svg-static-text" textAnchor="middle" dominantBaseline="middle" transform={textRotateTransform(colX(4), row1Y, AULA_W, AULA_H)}>
+                <text x={colX(4) + AULA_W/2} y={row1Y + AULA_H/2} className="svg-static-text" textAnchor="middle" dominantBaseline="middle">
                     Oficina
                 </text>
 
                 <rect x={colX(5)} y={row1Y} width={AULA_W} height={AULA_H} rx={8} className="svg-static-dashed" />
-                <text x={colX(5) + AULA_W/2} y={row1Y + AULA_H/2} className="svg-static-text" textAnchor="middle" dominantBaseline="middle" transform={textRotateTransform(colX(5), row1Y, AULA_W, AULA_H)}>
+                <text x={colX(5) + AULA_W/2} y={row1Y + AULA_H/2} className="svg-static-text" textAnchor="middle" dominantBaseline="middle">
                     Oficina
                 </text>
 
                 <rect x={colX(6)} y={row1Y} width={AULA_W} height={AULA_H} rx={8} className="svg-static-dashed" />
-                <g transform={textRotateTransform(colX(6), row1Y, AULA_W, AULA_H)}>
+                <g>
                    {/* Lineas de Escalera */}
                    <line x1={colX(6)+25} y1={row1Y+20} x2={colX(6)+AULA_W-25} y2={row1Y+20} stroke="rgba(255,255,255,0.15)" strokeWidth={2} />
                    <line x1={colX(6)+25} y1={row1Y+35} x2={colX(6)+AULA_W-25} y2={row1Y+35} stroke="rgba(255,255,255,0.15)" strokeWidth={2} />
@@ -233,7 +159,7 @@ export const InteractiveMap: React.FC = () => {
             {/* Oficina Amplia - Inferior (Indices 5 y 6, Span2) */}
             <g>
                 <rect x={colX(5)} y={row3Y} width={AULA_W * 2 + GAP_X} height={AULA_H} rx={8} className="svg-static-dashed" />
-                <text x={colX(5) + (AULA_W * 2 + GAP_X)/2} y={row3Y + AULA_H/2} className="svg-static-text" textAnchor="middle" dominantBaseline="middle" transform={textRotateTransform(colX(5), row3Y, AULA_W * 2 + GAP_X, AULA_H)}>
+                <text x={colX(5) + (AULA_W * 2 + GAP_X)/2} y={row3Y + AULA_H/2} className="svg-static-text" textAnchor="middle" dominantBaseline="middle">
                     Oficina
                 </text>
             </g>

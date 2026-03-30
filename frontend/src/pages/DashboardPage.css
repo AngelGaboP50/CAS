@@ -703,47 +703,6 @@
   color: var(--color-on-surface);
 }
 
-.map-header-right {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.map-controls {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  background: var(--color-surface-container-high);
-  padding: 5px;
-  border-radius: 10px;
-  border: 1px solid var(--color-outline-variant);
-}
-
-.map-btn {
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-on-surface-variant);
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  transition: all .2s;
-}
-
-.map-btn.active {
-  background: rgba(146, 204, 255, .15);
-  color: var(--color-primary);
-}
-
-.map-btn:hover:not(.active) {
-  background: rgba(255, 255, 255, .05);
-}
 
 .map-grid {
   display: grid;
