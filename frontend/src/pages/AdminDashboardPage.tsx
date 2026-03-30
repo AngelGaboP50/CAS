@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import './DashboardPage.css' // Reutilizamos los estilos del dashboard normal
 import { InteractiveMap } from '../components/InteractiveMap'
 import { useAulas, type EstadoAula } from '../hooks/useAulas'
+import { useNotificaciones } from '../hooks/useNotificaciones'
 
 function AdminDashboardPage() {
   const navigate = useNavigate()
@@ -12,6 +13,20 @@ function AdminDashboardPage() {
     const usuarioRaw = sessionStorage.getItem('usuario')
     return usuarioRaw ? JSON.parse(usuarioRaw) : null
   })
+
+  // Hook de Notificaciones
+  const { noLeidas, marcarComoLeidas } = useNotificaciones(usuario?.id)
+
+  // Reloj en vivo
+  const [currentDate, setCurrentDate] = useState(new Date())
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentDate(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const timeStr = currentDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
+  const dateStr = currentDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   // Estado para las pestañas (Tabs del Sidebar)
   const [activeTab, setActiveTab] = useState<'principal' | 'usuarios' | 'perfil'>('principal')
@@ -166,9 +181,24 @@ function AdminDashboardPage() {
         <div className="dash-brand">
           <div className="dash-brand-bar" />
           <div>
-            <h1 className="dash-brand-title">CAS</h1>
-            <p className="dash-brand-sub">Panel de Administración</p>
+            <h1 className="dash-brand-title" style={{ fontSize: '18px' }}>Control de Acceso</h1>
           </div>
+        </div>
+
+        <div className="dash-live-info">
+          <div className="live-indicator">
+            <span className="live-dot" />
+            <span>En vivo</span>
+          </div>
+          <span className="live-time">{timeStr}</span>
+          <span className="live-date">{dateStr}</span>
+        </div>
+
+        <div className="dash-header-actions">
+          <button className="dash-icon-btn" title="Notificaciones" onClick={marcarComoLeidas}>
+            <span className="material-symbols-outlined">notifications</span>
+            {noLeidas > 0 && <span className="notif-badge">{noLeidas}</span>}
+          </button>
         </div>
       </header>
 

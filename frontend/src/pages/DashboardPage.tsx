@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import { supabase } from '../supabaseClient'
+import { useNotificaciones, notificarAdmins } from '../hooks/useNotificaciones'
 import './DashboardPage.css'
 
 const BUCKET = 'files'
@@ -28,6 +29,20 @@ function DashboardPage() {
   // ── NFC / QR modal state ─────────────────────────────────────────
   const [nfcModalOpen, setNfcModalOpen] = useState(false)
   const [qrData, setQrData] = useState<string | null>(null)
+
+  // ── Reloj en vivo ────────────────────────────────────────────────
+  const [currentDate, setCurrentDate] = useState(new Date())
+
+  // ── Notificaciones ───────────────────────────────────────────────
+  const { noLeidas, marcarComoLeidas } = useNotificaciones(usuario?.id);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentDate(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const timeStr = currentDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
+  const dateStr = currentDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   useEffect(() => {
     if (!usuario) {
@@ -118,6 +133,13 @@ function DashboardPage() {
       if (error) throw error
 
       await fetchHorario()
+      
+      // Notificamos a los administradores del cambio
+      await notificarAdmins(
+        'Horario Actualizado',
+        `El profesor ${usuario.nombre} ha subido su archivo de horario.`,
+        'info'
+      )
     } catch (err: any) {
       setErrorMsg('Error al subir el archivo. Verifica los permisos del bucket.')
       console.error(err)
@@ -166,6 +188,13 @@ function DashboardPage() {
 
       setHorarioUrl(null)
       setDeleteConfirm(false)
+      
+      // Notificamos a los administradores del cambio
+      await notificarAdmins(
+        'Horario Eliminado',
+        `El profesor ${usuario.nombre} ha eliminado su archivo de horario.`,
+        'alerta'
+      )
     } catch (err: any) {
       setErrorMsg('Error al eliminar el horario. Intenta de nuevo.')
       console.error(err)
@@ -186,14 +215,29 @@ function DashboardPage() {
         <div className="dash-brand">
           <div className="dash-brand-bar" />
           <div>
-            <h1 className="dash-brand-title">CAS</h1>
-            <p className="dash-brand-sub">Control de Acceso a Salones</p>
+            <h1 className="dash-brand-title" style={{ fontSize: '18px' }}>Control de Acceso</h1>
           </div>
         </div>
-        <button className="dash-logout-btn" onClick={handleLogout}>
-          <span className="material-symbols-outlined">logout</span>
-          Cerrar sesión
-        </button>
+
+        <div className="dash-live-info">
+          <div className="live-indicator">
+            <span className="live-dot" />
+            <span>En vivo</span>
+          </div>
+          <span className="live-time">{timeStr}</span>
+          <span className="live-date">{dateStr}</span>
+        </div>
+
+        <div className="dash-header-actions">
+          <button className="dash-icon-btn" title="Notificaciones" onClick={marcarComoLeidas}>
+            <span className="material-symbols-outlined">notifications</span>
+            {noLeidas > 0 && <span className="notif-badge">{noLeidas}</span>}
+          </button>
+          <button className="dash-logout-btn" onClick={handleLogout} style={{ marginLeft: '12px' }}>
+            <span className="material-symbols-outlined">logout</span>
+            Cerrar sesión
+          </button>
+        </div>
       </header>
 
       {/* Main */}
@@ -407,6 +451,12 @@ function DashboardPage() {
                       onScan={(result) => {
                         if (result && result.length > 0) {
                           setQrData(result[0].rawValue)
+                          // Notificar al admin sobre el escaneo como prueba
+                          notificarAdmins(
+                            'Código QR Escaneado',
+                            `El profesor ${usuario?.nombre} ha escaneado un código QR de acceso.`,
+                            'excepcion'
+                          )
                         }
                       }}
                       onError={(error) => console.log(error)}

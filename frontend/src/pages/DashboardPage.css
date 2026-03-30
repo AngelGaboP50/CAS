@@ -79,10 +79,15 @@
   z-index: 10;
 }
 
+.dash-header > div {
+  flex: 1;
+}
+
 .dash-brand {
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-content: flex-start;
 }
 
 .dash-brand-bar {
@@ -129,6 +134,94 @@
 
 .dash-logout-btn .material-symbols-outlined {
   font-size: 18px;
+}
+
+/* ─── Header Info (Center) y Acciones (Right) ─────────────── */
+.dash-live-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-secondary);
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-secondary);
+  box-shadow: 0 0 8px rgba(74, 225, 131, 0.6);
+  animation: blinkLive 1.5s infinite alternate;
+}
+
+@keyframes blinkLive {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+.live-time, .live-date {
+  opacity: 0.85;
+}
+
+.dash-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dash-icon-btn {
+  background: transparent;
+  border: 1px solid var(--color-outline-variant);
+  color: var(--color-on-surface-variant);
+  border-radius: 8px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  padding: 0;
+}
+
+.dash-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-on-surface);
+  border-color: var(--color-outline-variant);
+}
+
+.dash-icon-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #ff4d4f;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  height: 16px;
+  min-width: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 2px var(--color-bg);
 }
 
 /* ─── Main ───────────────────────────────────────────────────── */
