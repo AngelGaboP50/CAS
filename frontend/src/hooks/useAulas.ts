@@ -1,3 +1,7 @@
+// src/hooks/useAulas.ts — REEMPLAZA el archivo actual completo
+// Cambio: lee la columna 'estado' de la BD (en lugar de derivarla de 'activo')
+// y expone fetchAulas para que los componentes puedan forzar recarga.
+
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
 
@@ -10,27 +14,25 @@ export interface AulaRemote {
 }
 
 export function useAulas() {
-  const [aulas, setAulas] = useState<AulaRemote[]>([])
+  const [aulas, setAulas]     = useState<AulaRemote[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
 
   const fetchAulas = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data, error: err } = await supabase
       .from('salones')
-      .select('id, nombre, activo') // Según tu esquema
+      .select('id, nombre, activo, estado')   // lee 'estado' si existe
       .order('nombre', { ascending: true })
 
-    if (error) {
-      console.warn('Error fetching salones:', error.message)
-      setError(error.message)
+    if (err) {
+      setError(err.message)
     } else if (data) {
-      // Mapeamos a la interfaz que espera el componente (AulaRemote)
       const mappedData: AulaRemote[] = data.map(s => ({
-        id: s.id,
+        id:    s.id,
         label: s.nombre,
-        // Traducimos el booleano 'activo' a nuestros estados del mapa. 
-        estado: s.activo ? 'LIBRE' : 'NO_DISPONIBLE'
+        // Usa la columna 'estado' si existe; si no, deriva del booleano 'activo'
+        estado: (s.estado as EstadoAula) ?? (s.activo ? 'LIBRE' : 'NO_DISPONIBLE'),
       }))
       setAulas(mappedData)
     }
@@ -43,31 +45,24 @@ export function useAulas() {
     const subscription = supabase
       .channel('salones_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'salones' }, () => {
-        // Al detectar un cambio en la tabla salones, actualizamos
-        fetchAulas();
+        fetchAulas()
       })
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(subscription)
-    }
+    return () => { supabase.removeChannel(subscription) }
   }, [fetchAulas])
 
   const updateEstadoAula = async (id: string, nuevoEstado: EstadoAula) => {
-    // Si queremos "desactivar" un salón, ponemos activo = false, para el resto activo = true.
-    const isActivo = nuevoEstado !== 'NO_DISPONIBLE';
-    
-    // NOTA: Como en tu tabla "salones" no hay un campo "estado" explícito, 
-    // solo estamos actualizando el campo "activo". 
-    const { error } = await supabase
+    const { error: err } = await supabase
       .from('salones')
-      .update({ activo: isActivo })
+      .update({
+        estado: nuevoEstado,
+        activo: nuevoEstado !== 'NO_DISPONIBLE',
+      })
       .eq('id', id)
-      
-    if (error) {
-      console.error('Error updating salon:', error.message)
-      throw error
-    }
+
+    if (err) throw err
+    await fetchAulas()
   }
 
   return { aulas, loading, error, updateEstadoAula, fetchAulas }
