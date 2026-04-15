@@ -1,13 +1,14 @@
-// src/pages/DashboardPage.tsx — REEMPLAZA el archivo actual completo
-// Agrega: validación real de QR, links a salones y accesos, mejoras de navegación
+// src/pages/DashboardPage.tsx
+// Horarios: solo lectura para el profesor. El administrador es quien asigna los horarios.
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import { supabase } from '../supabaseClient'
 import { useNotificaciones, notificarAdmins } from '../hooks/useNotificaciones'
 import { useAccesos } from '../hooks/useAccesos'
 import { useAulas } from '../hooks/useAulas'
+import { useHorarios } from '../hooks/useHorarios'
 import './DashboardPage.css'
 
 const BUCKET = 'files'
@@ -18,6 +19,15 @@ interface ResultadoQR {
   motivo: string
   salon: string
   materia: string | null
+}
+
+const DIAS_LABEL: Record<string, string> = {
+  LUNES: 'Lunes',
+  MARTES: 'Martes',
+  MIERCOLES: 'Miércoles',
+  JUEVES: 'Jueves',
+  VIERNES: 'Viernes',
+  SABADO: 'Sábado',
 }
 
 function DashboardPage() {
@@ -31,12 +41,9 @@ function DashboardPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [horarioUrl, setHorarioUrl] = useState<string | null>(null)
   const [loadingHorario, setLoadingHorario] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [dragOver, setDragOver] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // Vista: 'imagen' | 'tabla'
+  const [vistaHorario, setVistaHorario] = useState<'imagen' | 'tabla'>('tabla')
 
   // ── QR modal state ──
   const [qrModalOpen, setQrModalOpen] = useState(false)
@@ -60,6 +67,9 @@ function DashboardPage() {
   const { registrarAcceso, validarAccesoQR } = useAccesos()
   const { aulas } = useAulas()
 
+  // ── Horarios estructurados del profesor (asignados por el admin) ──
+  const { horarios, loading: loadingHorarios, horarioHoy } = useHorarios(userId)
+
   useEffect(() => {
     if (!usuario) {
       navigate('/login', { replace: true })
@@ -68,7 +78,7 @@ function DashboardPage() {
     }
   }, [usuario, navigate])
 
-  // ── Cargar horario ──
+  // ── Cargar imagen de horario (solo lectura, subida por el admin) ──
   const fetchHorario = useCallback(async () => {
     if (!userId) return
     setLoadingHorario(true)
@@ -101,63 +111,12 @@ function DashboardPage() {
     navigate('/login', { replace: true })
   }
 
-  // ── Subir horario ──
-  const handleFileSelect = async (file: File) => {
-    if (!file.type.startsWith('image/')) { setErrorMsg('Solo se permiten imágenes PNG o JPG.'); return }
-    if (file.size > 10 * 1024 * 1024) { setErrorMsg('El archivo no puede superar los 10 MB.'); return }
-    setErrorMsg(null); setUploading(true)
-    try {
-      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-      const path = `${HORARIOS_FOLDER}/${usuario.id}/horario.${ext}`
-      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type })
-      if (error) throw error
-      await fetchHorario()
-      await notificarAdmins('Horario Actualizado', `El profesor ${usuario.nombre} ha subido su archivo de horario.`, 'info')
-    } catch {
-      setErrorMsg('Error al subir el archivo. Verifica los permisos del bucket.')
-    } finally {
-      setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (file) handleFileSelect(file)
-  }
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault(); setDragOver(false)
-    const file = e.dataTransfer.files?.[0]; if (file) handleFileSelect(file)
-  }
-
-  // ── Eliminar horario ──
-  const handleDeleteHorario = async () => {
-    if (!horarioUrl) return
-    setDeleting(true); setErrorMsg(null)
-    try {
-      const { data, error: listErr } = await supabase.storage.from(BUCKET).list(`${HORARIOS_FOLDER}/${usuario.id}`)
-      if (listErr) throw listErr
-      const paths = (data ?? []).map(f => `${HORARIOS_FOLDER}/${usuario.id}/${f.name}`)
-      if (paths.length > 0) {
-        const { error: removeErr } = await supabase.storage.from(BUCKET).remove(paths)
-        if (removeErr) throw removeErr
-      }
-      setHorarioUrl(null); setDeleteConfirm(false)
-      await notificarAdmins('Horario Eliminado', `El profesor ${usuario.nombre} ha eliminado su archivo de horario.`, 'alerta')
-    } catch {
-      setErrorMsg('Error al eliminar el horario. Intenta de nuevo.')
-    } finally {
-      setDeleting(false)
-    }
-  }
-
   // ── LÓGICA QR REAL: parsea el QR → valida horario ──
-  // El QR del salón debe tener el formato: "SALON:<salon_uuid>"
   const handleQRScan = async (rawValue: string) => {
     if (validandoQr || !usuario) return
     setValidandoQr(true)
 
     try {
-      // El QR de cada cerradura debe tener este formato
       if (!rawValue.startsWith('SALON:')) {
         setQrResultado({
           autorizado: false,
@@ -170,7 +129,6 @@ function DashboardPage() {
 
       const salonId = rawValue.replace('SALON:', '').trim()
 
-      // Obtener nombre del salón
       const { data: salonData } = await supabase
         .from('salones')
         .select('nombre')
@@ -179,7 +137,6 @@ function DashboardPage() {
 
       const nombreSalon = salonData?.nombre ?? salonId
 
-      // Llamar función SQL de validación
       const resultado = await validarAccesoQR(usuario.id, salonId)
 
       setQrResultado({
@@ -189,7 +146,6 @@ function DashboardPage() {
         materia: resultado.materia,
       })
 
-      // Registrar el acceso en la BD
       await registrarAcceso({
         salon_id: salonId,
         profesor_id: usuario.id,
@@ -200,12 +156,10 @@ function DashboardPage() {
         motivo_denegacion: resultado.autorizado ? undefined : resultado.motivo,
       })
 
-      // Actualizar estado del salón si fue permitido
       if (resultado.autorizado) {
         await supabase.from('salones').update({ estado: 'EN_CLASE', activo: true }).eq('id', salonId)
       }
 
-      // Notificar al admin si fue denegado
       if (!resultado.autorizado) {
         await notificarAdmins(
           'Acceso Denegado',
@@ -226,6 +180,7 @@ function DashboardPage() {
   }
 
   const salonesLibres = aulas.filter(a => a.estado === 'LIBRE').length
+  const hoy = horarioHoy()
 
   if (!usuario) return null
 
@@ -280,13 +235,17 @@ function DashboardPage() {
             </span>
           </div>
 
-          {/* Mis Horarios */}
-          <div className="dash-card dash-card--clickable" onClick={() => { setDeleteConfirm(false); setErrorMsg(null); setModalOpen(true) }} id="card-mis-horarios">
+          {/* Mis Horarios — solo lectura */}
+          <div
+            className="dash-card dash-card--clickable"
+            onClick={() => { setErrorMsg(null); setModalOpen(true) }}
+            id="card-mis-horarios"
+          >
             <span className="material-symbols-outlined dash-card-icon">calendar_month</span>
             <h3 className="dash-card-title">Mis Horarios</h3>
-            <p className="dash-card-desc">Visualiza tus horarios asignados por salón y día.</p>
-            <span className={`dash-card-tag${horarioUrl ? ' dash-card-tag--active' : ''}`}>
-              {horarioUrl ? 'Ver horario' : 'Subir horario'}
+            <p className="dash-card-desc">Consulta los horarios asignados por el administrador.</p>
+            <span className={`dash-card-tag${hoy.length > 0 ? ' dash-card-tag--active' : ''}`}>
+              {hoy.length > 0 ? `${hoy.length} clase${hoy.length > 1 ? 's' : ''} hoy` : 'Ver horario'}
             </span>
           </div>
 
@@ -320,63 +279,118 @@ function DashboardPage() {
         <p>© 2026 IDGS15 Equipo 6. TODOS LOS DERECHOS RESERVADOS.</p>
       </footer>
 
-      {/* ── Modal Horario (sin cambios respecto al original) ── */}
+      {/* ── Modal Horario (solo lectura) ── */}
       {modalOpen && (
-        <div className="hor-overlay" onClick={e => e.target === e.currentTarget && !uploading && !deleting && setModalOpen(false)}>
-          <div className="hor-modal">
+        <div className="hor-overlay" onClick={e => e.target === e.currentTarget && setModalOpen(false)}>
+          <div className="hor-modal" style={{ maxWidth: '720px', width: '95%' }}>
             <div className="hor-modal-header">
               <div className="hor-modal-title-row">
                 <span className="material-symbols-outlined hor-modal-icon">calendar_month</span>
                 <h2 className="hor-modal-title">Mis Horarios</h2>
               </div>
-              <button className="hor-close-btn" onClick={() => !uploading && !deleting && setModalOpen(false)} disabled={uploading || deleting}>
+              <button className="hor-close-btn" onClick={() => setModalOpen(false)}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            {errorMsg && <div className="hor-error-banner"><span className="material-symbols-outlined">error</span>{errorMsg}</div>}
-            {loadingHorario ? (
-              <div className="hor-loading-area"><div className="hor-spinner" /><p className="hor-loading-text">Cargando horario...</p></div>
-            ) : horarioUrl ? (
-              <div className="hor-preview-area">
-                <img src={horarioUrl} alt="Mi horario" className="hor-preview-img" />
-                {!deleteConfirm ? (
-                  <div className="hor-actions">
-                    <p className="hor-hint">Para subir un nuevo horario, primero elimina el actual.</p>
-                    <button className="hor-delete-btn" onClick={() => setDeleteConfirm(true)}>
-                      <span className="material-symbols-outlined">delete</span>Eliminar horario
-                    </button>
-                  </div>
-                ) : (
-                  <div className="hor-confirm-area">
-                    <p className="hor-confirm-text">¿Estás seguro? Esta acción no se puede deshacer.</p>
-                    <div className="hor-confirm-btns">
-                      <button className="hor-cancel-btn" onClick={() => setDeleteConfirm(false)} disabled={deleting}>Cancelar</button>
-                      <button className="hor-confirm-delete-btn" onClick={handleDeleteHorario} disabled={deleting}>
-                        {deleting ? <><div className="hor-btn-spinner" />Eliminando...</> : <><span className="material-symbols-outlined">delete_forever</span>Sí, eliminar</>}
-                      </button>
-                    </div>
-                  </div>
-                )}
+
+            {/* Selector de vista */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <button
+                onClick={() => setVistaHorario('tabla')}
+                style={{
+                  padding: '8px 18px', borderRadius: '8px', border: '1px solid var(--color-outline-variant)',
+                  background: vistaHorario === 'tabla' ? 'rgba(146,204,255,.15)' : 'transparent',
+                  color: vistaHorario === 'tabla' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
+                  cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px', fontWeight: vistaHorario === 'tabla' ? 600 : 400,
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>table_view</span>
+                Horario semanal
+              </button>
+              <button
+                onClick={() => { setVistaHorario('imagen'); fetchHorario() }}
+                style={{
+                  padding: '8px 18px', borderRadius: '8px', border: '1px solid var(--color-outline-variant)',
+                  background: vistaHorario === 'imagen' ? 'rgba(146,204,255,.15)' : 'transparent',
+                  color: vistaHorario === 'imagen' ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
+                  cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px', fontWeight: vistaHorario === 'imagen' ? 600 : 400,
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>image</span>
+                Imagen de horario
+              </button>
+            </div>
+
+            {errorMsg && (
+              <div className="hor-error-banner">
+                <span className="material-symbols-outlined">error</span>{errorMsg}
               </div>
-            ) : (
-              <div className="hor-upload-area">
-                <div
-                  className={`hor-drop-zone${dragOver ? ' hor-drop-zone--active' : ''}${uploading ? ' hor-drop-zone--uploading' : ''}`}
-                  onDragOver={e => { e.preventDefault(); if (!uploading) setDragOver(true) }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={handleDrop}
-                  onClick={() => !uploading && fileInputRef.current?.click()}>
-                  {uploading ? (
-                    <><div className="hor-spinner" /><p className="hor-drop-title">Subiendo horario...</p><p className="hor-drop-sub">Por favor espera</p></>
-                  ) : (
-                    <><span className="material-symbols-outlined hor-upload-icon">upload_file</span>
-                    <p className="hor-drop-title">Arrastra tu horario aquí</p>
-                    <p className="hor-drop-sub">o haz clic para seleccionar un archivo</p>
-                    <span className="hor-format-tag">PNG · JPG · JPEG · máx. 10 MB</span></>
-                  )}
+            )}
+
+            {/* Vista: tabla de horarios estructurados */}
+            {vistaHorario === 'tabla' && (
+              loadingHorarios ? (
+                <div className="hor-loading-area">
+                  <div className="hor-spinner" />
+                  <p className="hor-loading-text">Cargando horario...</p>
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} onChange={handleInputChange} />
-              </div>
+              ) : horarios.length > 0 ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '500px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--color-outline-variant)' }}>
+                        {['Día', 'Salón', 'Horario', 'Materia'].map(h => (
+                          <th key={h} style={{ padding: '12px', color: 'var(--color-on-surface-variant)', fontWeight: 500, textAlign: 'left', fontSize: '13px' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {horarios.map(h => (
+                        <tr key={h.id} style={{ borderBottom: '1px solid rgba(63,72,80,.4)' }}>
+                          <td style={{ padding: '12px', fontSize: '14px', fontWeight: 500 }}>{DIAS_LABEL[h.dia_semana] ?? h.dia_semana}</td>
+                          <td style={{ padding: '12px', fontSize: '14px' }}>{h.salon?.nombre ?? h.salon_id}</td>
+                          <td style={{ padding: '12px', fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>{h.hora_inicio} – {h.hora_fin}</td>
+                          <td style={{ padding: '12px', fontSize: '14px' }}>{h.materia}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p style={{ marginTop: '16px', fontSize: '12px', color: 'var(--color-on-surface-variant)', textAlign: 'center' }}>
+                    Los horarios son asignados por el administrador. Si hay algún error, comunícate con él.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-on-surface-variant)', display: 'block', marginBottom: '12px' }}>event_busy</span>
+                  <p style={{ color: 'var(--color-on-surface-variant)', marginBottom: '8px' }}>No tienes horarios asignados aún.</p>
+                  <p style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>El administrador asignará tus horarios próximamente.</p>
+                </div>
+              )
+            )}
+
+            {/* Vista: imagen de horario */}
+            {vistaHorario === 'imagen' && (
+              loadingHorario ? (
+                <div className="hor-loading-area">
+                  <div className="hor-spinner" />
+                  <p className="hor-loading-text">Cargando imagen...</p>
+                </div>
+              ) : horarioUrl ? (
+                <div className="hor-preview-area">
+                  <img src={horarioUrl} alt="Mi horario" className="hor-preview-img" />
+                  <p style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-on-surface-variant)', textAlign: 'center' }}>
+                    Imagen de horario asignada por el administrador.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-on-surface-variant)', display: 'block', marginBottom: '12px' }}>image_not_supported</span>
+                  <p style={{ color: 'var(--color-on-surface-variant)', marginBottom: '8px' }}>No hay imagen de horario disponible.</p>
+                  <p style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>El administrador puede subir una imagen de tu horario.</p>
+                </div>
+              )
             )}
           </div>
         </div>

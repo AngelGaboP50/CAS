@@ -1,7 +1,7 @@
 // src/pages/AdminDashboardPage.tsx — REEMPLAZA el archivo actual completo
 // Agrega: tab de Solicitudes, tab de Historial, gestión de Horarios, notificaciones navegables
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import './DashboardPage.css'
@@ -54,9 +54,9 @@ export default function AdminDashboardPage() {
   const { aulas, updateEstadoAula } = useAulas()
 
   // ── Solicitudes ──
-  const { solicitudes, loadingS, responderSolicitud } = (() => {
-    const { solicitudes, loading: loadingS, responderSolicitud } = useSolicitudes(undefined, true)
-    return { solicitudes, loadingS, responderSolicitud }
+  const { solicitudes, responderSolicitud } = (() => {
+    const { solicitudes, responderSolicitud } = useSolicitudes(undefined, true)
+    return { solicitudes, responderSolicitud }
   })()
   const [modalSol, setModalSol] = useState<string | null>(null)
   const [accionSol, setAccionSol] = useState<'APROBADA' | 'RECHAZADA'>('APROBADA')
@@ -72,6 +72,90 @@ export default function AdminDashboardPage() {
   const [hForm, setHForm] = useState({ profesor_id: '', salon_id: '', dia_semana: 'LUNES' as DiaSemana, hora_inicio: '', hora_fin: '', materia: '' })
   const [creandoH, setCreandoH] = useState(false)
   const [errorH, setErrorH] = useState('')
+
+  // ── Imagen de horario por profesor (admin sube/elimina) ──
+  const BUCKET = 'files'
+  const HORARIOS_FOLDER = 'imagenes'
+  const [modalImagenHorario, setModalImagenHorario] = useState(false)
+  const [profesorSeleccionado, setProfesorSeleccionado] = useState<any>(null)
+  const [imagenHorarioUrl, setImagenHorarioUrl] = useState<string | null>(null)
+  const [loadingImagen, setLoadingImagen] = useState(false)
+  const [uploadingImagen, setUploadingImagen] = useState(false)
+  const [deletingImagen, setDeletingImagen] = useState(false)
+  const [errorImagen, setErrorImagen] = useState<string | null>(null)
+  const [deleteConfirmImagen, setDeleteConfirmImagen] = useState(false)
+  const fileInputAdminRef = useRef<HTMLInputElement>(null)
+
+  const fetchImagenHorario = async (profesorId: number) => {
+    setLoadingImagen(true)
+    setErrorImagen(null)
+    try {
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .list(`${HORARIOS_FOLDER}/${profesorId}`, { limit: 5 })
+      if (error) throw error
+      const archivo = data?.find((f: any) => f.name.startsWith('horario.'))
+      if (archivo) {
+        const { data: urlData } = supabase.storage
+          .from(BUCKET)
+          .getPublicUrl(`${HORARIOS_FOLDER}/${profesorId}/${archivo.name}`)
+        setImagenHorarioUrl(`${urlData.publicUrl}?t=${Date.now()}`)
+      } else {
+        setImagenHorarioUrl(null)
+      }
+    } catch {
+      setErrorImagen('No se pudo cargar la imagen del horario.')
+    } finally {
+      setLoadingImagen(false)
+    }
+  }
+
+  const abrirModalImagenHorario = (prof: any) => {
+    setProfesorSeleccionado(prof)
+    setImagenHorarioUrl(null)
+    setErrorImagen(null)
+    setDeleteConfirmImagen(false)
+    setModalImagenHorario(true)
+    fetchImagenHorario(prof.id)
+  }
+
+  const handleSubirImagenHorario = async (file: File) => {
+    if (!profesorSeleccionado) return
+    if (!file.type.startsWith('image/')) { setErrorImagen('Solo se permiten imágenes PNG o JPG.'); return }
+    if (file.size > 10 * 1024 * 1024) { setErrorImagen('El archivo no puede superar los 10 MB.'); return }
+    setErrorImagen(null); setUploadingImagen(true)
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const path = `${HORARIOS_FOLDER}/${profesorSeleccionado.id}/horario.${ext}`
+      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type })
+      if (error) throw error
+      await fetchImagenHorario(profesorSeleccionado.id)
+    } catch {
+      setErrorImagen('Error al subir la imagen. Verifica los permisos del bucket.')
+    } finally {
+      setUploadingImagen(false)
+      if (fileInputAdminRef.current) fileInputAdminRef.current.value = ''
+    }
+  }
+
+  const handleEliminarImagenHorario = async () => {
+    if (!profesorSeleccionado) return
+    setDeletingImagen(true); setErrorImagen(null)
+    try {
+      const { data, error: listErr } = await supabase.storage.from(BUCKET).list(`${HORARIOS_FOLDER}/${profesorSeleccionado.id}`)
+      if (listErr) throw listErr
+      const paths = (data ?? []).map((f: any) => `${HORARIOS_FOLDER}/${profesorSeleccionado.id}/${f.name}`)
+      if (paths.length > 0) {
+        const { error: removeErr } = await supabase.storage.from(BUCKET).remove(paths)
+        if (removeErr) throw removeErr
+      }
+      setImagenHorarioUrl(null); setDeleteConfirmImagen(false)
+    } catch {
+      setErrorImagen('Error al eliminar la imagen. Intenta de nuevo.')
+    } finally {
+      setDeletingImagen(false)
+    }
+  }
 
   useEffect(() => {
     if (!usuario) { navigate('/login', { replace: true }); return }
@@ -105,7 +189,7 @@ export default function AdminDashboardPage() {
     } else {
       // Crear en Supabase Auth + tabla usuarios
       if (!formPassword) { alert('Debes ingresar una contraseña para el nuevo usuario'); return }
-      const { data: authData, error: authErr } = await supabase.auth.admin
+      const { data: _authData, error: authErr } = await supabase.auth.admin
         ? await (supabase.auth as any).admin.createUser({ email: formEmail, password: formPassword, email_confirm: true })
         : { data: null, error: new Error('No tienes permisos de admin de Auth') }
 
@@ -405,9 +489,47 @@ export default function AdminDashboardPage() {
                     <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '28px' }}>schedule</span>
                     Gestión de Horarios
                   </h3>
-                  <button className="dash-logout-btn" onClick={() => { setModalHorario(true); setErrorH('') }} style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
-                    <span className="material-symbols-outlined">add</span> Nuevo Horario
-                  </button>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button className="dash-logout-btn" onClick={() => { setModalHorario(true); setErrorH('') }} style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
+                      <span className="material-symbols-outlined">add</span> Nuevo Horario
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sección: Imágenes de horario por profesor */}
+                <div style={{ marginBottom: '32px', padding: '20px', background: 'var(--color-surface-container-high)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }}>
+                  <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-on-surface-variant)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>image</span>
+                    Imágenes de horario por profesor
+                  </h4>
+                  {loadingUsuarios ? (
+                    <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px' }}>Cargando profesores...</p>
+                  ) : usuarios.filter(u => u.tipo === 'profesor').length === 0 ? (
+                    <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px' }}>No hay profesores registrados.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                      {usuarios.filter(u => u.tipo === 'profesor').map(prof => (
+                        <button
+                          key={prof.id}
+                          onClick={() => abrirModalImagenHorario(prof)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '10px 16px', borderRadius: '10px',
+                            border: '1px solid var(--color-outline-variant)',
+                            background: 'transparent', color: 'var(--color-on-surface)',
+                            cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px',
+                            transition: 'all 0.2s',
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-primary)' }}
+                          onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--color-outline-variant)'; e.currentTarget.style.color = 'var(--color-on-surface)' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>person</span>
+                          {prof.nombre}
+                          <span className="material-symbols-outlined" style={{ fontSize: '16px', opacity: 0.6 }}>upload_file</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {loadingHorarios ? (
@@ -592,6 +714,71 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Imagen de Horario por Profesor (Admin) */}
+      {modalImagenHorario && profesorSeleccionado && (
+        <div className="hor-overlay" onClick={e => e.target === e.currentTarget && !uploadingImagen && !deletingImagen && setModalImagenHorario(false)}>
+          <div className="hor-modal">
+            <div className="hor-modal-header">
+              <div className="hor-modal-title-row">
+                <span className="material-symbols-outlined hor-modal-icon">image</span>
+                <h2 className="hor-modal-title">Imagen de horario — {profesorSeleccionado.nombre}</h2>
+              </div>
+              <button className="hor-close-btn" onClick={() => !uploadingImagen && !deletingImagen && setModalImagenHorario(false)} disabled={uploadingImagen || deletingImagen}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {errorImagen && (
+              <div className="hor-error-banner"><span className="material-symbols-outlined">error</span>{errorImagen}</div>
+            )}
+            {loadingImagen ? (
+              <div className="hor-loading-area"><div className="hor-spinner" /><p className="hor-loading-text">Cargando imagen...</p></div>
+            ) : imagenHorarioUrl ? (
+              <div className="hor-preview-area">
+                <img src={imagenHorarioUrl} alt="Horario" className="hor-preview-img" />
+                {!deleteConfirmImagen ? (
+                  <div className="hor-actions">
+                    <p className="hor-hint">Para subir una nueva imagen, primero elimina la actual.</p>
+                    <button className="hor-delete-btn" onClick={() => setDeleteConfirmImagen(true)}>
+                      <span className="material-symbols-outlined">delete</span>Eliminar imagen
+                    </button>
+                  </div>
+                ) : (
+                  <div className="hor-confirm-area">
+                    <p className="hor-confirm-text">¿Estás seguro? Esta acción no se puede deshacer.</p>
+                    <div className="hor-confirm-btns">
+                      <button className="hor-cancel-btn" onClick={() => setDeleteConfirmImagen(false)} disabled={deletingImagen}>Cancelar</button>
+                      <button className="hor-confirm-delete-btn" onClick={handleEliminarImagenHorario} disabled={deletingImagen}>
+                        {deletingImagen ? <><div className="hor-btn-spinner" />Eliminando...</> : <><span className="material-symbols-outlined">delete_forever</span>Sí, eliminar</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="hor-upload-area">
+                <div
+                  className={`hor-drop-zone${uploadingImagen ? ' hor-drop-zone--uploading' : ''}`}
+                  onDragOver={e => { e.preventDefault() }}
+                  onDrop={e => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (file) handleSubirImagenHorario(file) }}
+                  onClick={() => !uploadingImagen && fileInputAdminRef.current?.click()}
+                >
+                  {uploadingImagen ? (
+                    <><div className="hor-spinner" /><p className="hor-drop-title">Subiendo imagen...</p><p className="hor-drop-sub">Por favor espera</p></>
+                  ) : (
+                    <><span className="material-symbols-outlined hor-upload-icon">upload_file</span>
+                    <p className="hor-drop-title">Arrastra la imagen del horario aquí</p>
+                    <p className="hor-drop-sub">o haz clic para seleccionar un archivo</p>
+                    <span className="hor-format-tag">PNG · JPG · JPEG · máx. 10 MB</span></>
+                  )}
+                </div>
+                <input ref={fileInputAdminRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }}
+                  onChange={e => { const file = e.target.files?.[0]; if (file) handleSubirImagenHorario(file) }} />
+              </div>
+            )}
           </div>
         </div>
       )}
