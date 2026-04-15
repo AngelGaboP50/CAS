@@ -104,7 +104,7 @@ export default function SimulacionPuertaPage() {
     setSolicitudActiva(null)
   }
 
-  const urlQr = `https://devnationqro.com/salones?solicitar=${salonIdReal || 'demo'}`
+  const urlQr = `${window.location.origin}/salones?solicitar=${salonIdReal || 'demo'}`
 
   return (
     <div className="dash-root" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
