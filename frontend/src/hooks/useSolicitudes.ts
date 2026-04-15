@@ -47,7 +47,7 @@ export function useSolicitudes(profesorId?: number, soloAdmin = false) {
       .select(`
         *,
         salon:salones(nombre),
-        profesor:usuarios(nombre, correo)
+        profesor:usuarios!profesor_id(nombre, correo)
       `)
       .order('created_at', { ascending: false })
 

@@ -53,9 +53,9 @@ export const InteractiveMap: React.FC = () => {
 
   // Combina las aulas estáticas con el estado remoto de Supabase
   const aulasDinamicas = AULAS.map(aulaEstatica => {
-    const remota = aulasRemotas.find(a => a.label.includes(aulaEstatica.label));
+    const remota = aulasRemotas.find(a => a.id === aulaEstatica.id);
     if (remota) {
-      return { ...aulaEstatica, estado: remota.estado, idRemoto: remota.id };
+      return { ...aulaEstatica, estado: remota.estado, label: remota.label };
     }
     return aulaEstatica;
   });

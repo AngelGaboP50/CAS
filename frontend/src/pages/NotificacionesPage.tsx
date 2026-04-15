@@ -83,11 +83,17 @@ export default function NotificacionesPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {notificaciones.map(n => (
               <div key={n.id} className="dash-card"
+                onClick={() => {
+                  if (n.titulo.includes('solicitud') || n.titulo.includes('Solicitud')) {
+                    navigate(esAdmin ? '/admin' : '/solicitudes', { state: { tab: 'solicitudes' } })
+                  }
+                }}
                 style={{
                   padding: '18px 22px',
                   opacity: n.leida ? 0.65 : 1,
                   borderColor: n.leida ? 'var(--color-outline-variant)' : TIPO_COLOR[n.tipo] ?? 'var(--color-primary)',
                   transition: 'opacity .2s',
+                  cursor: 'pointer'
                 }}>
                 <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
                   <span className="material-symbols-outlined"

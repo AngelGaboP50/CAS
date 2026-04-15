@@ -2,7 +2,7 @@
 // Agrega: tab de Solicitudes, tab de Historial, gestión de Horarios, notificaciones navegables
 
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import './DashboardPage.css'
 import { InteractiveMap } from '../components/InteractiveMap'
@@ -29,6 +29,7 @@ function formatFecha(iso: string) {
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [usuario] = useState(getUsuario)
 
   const { noLeidas } = useNotificaciones(usuario?.id)
@@ -37,7 +38,7 @@ export default function AdminDashboardPage() {
   const timeStr = currentDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
   const dateStr = currentDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-  const [activeTab, setActiveTab] = useState<Tab>('principal')
+  const [activeTab, setActiveTab] = useState<Tab>(location.state?.tab || 'principal')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // ── Usuarios ──
@@ -54,17 +55,18 @@ export default function AdminDashboardPage() {
   const { aulas, updateEstadoAula } = useAulas()
 
   // ── Solicitudes ──
-  const { solicitudes, loadingS, responderSolicitud } = (() => {
-    const { solicitudes, loading: loadingS, responderSolicitud } = useSolicitudes(undefined, true)
-    return { solicitudes, loadingS, responderSolicitud }
-  })()
+  const solHook = useSolicitudes(undefined, true)
+  const solicitudes = solHook.solicitudes
+  const loadingS = solHook.loading
+  const responderSolicitud = solHook.responderSolicitud
+  const errorSol = solHook.error
   const [modalSol, setModalSol] = useState<string | null>(null)
   const [accionSol, setAccionSol] = useState<'APROBADA' | 'RECHAZADA'>('APROBADA')
   const [respuestaSol, setRespuestaSol] = useState('')
   const [procesandoSol, setProcesandoSol] = useState(false)
 
   // ── Historial ──
-  const { accesos, loading: loadingAccesos } = useAccesos()
+  const { accesos, loading: loadingAccesos, registrarAcceso } = useAccesos()
 
   // ── Horarios ──
   const { horarios, loading: loadingHorarios, crearHorario, eliminarHorario } = useHorarios()
@@ -105,9 +107,9 @@ export default function AdminDashboardPage() {
     } else {
       // Crear en Supabase Auth + tabla usuarios
       if (!formPassword) { alert('Debes ingresar una contraseña para el nuevo usuario'); return }
-      const { data: authData, error: authErr } = await supabase.auth.admin
+      const { error: authErr } = await supabase.auth.admin
         ? await (supabase.auth as any).admin.createUser({ email: formEmail, password: formPassword, email_confirm: true })
-        : { data: null, error: new Error('No tienes permisos de admin de Auth') }
+        : { error: new Error('No tienes permisos de admin de Auth') }
 
       if (authErr) {
         // Fallback: insertar solo en tabla pública (el usuario deberá usar "olvidé contraseña")
@@ -134,6 +136,25 @@ export default function AdminDashboardPage() {
     setProcesandoSol(true)
     try {
       await responderSolicitud(modalSol, usuario.id, accionSol, respuestaSol, sol)
+      if (accionSol === 'APROBADA') {
+        try { await updateEstadoAula(sol.salon_id, 'EN_CLASE') } catch (e) { console.error('Error al actualizar salón', e) }
+        await registrarAcceso({
+          salon_id: sol.salon_id,
+          profesor_id: sol.profesor_id,
+          tipo: 'EXCEPCION',
+          metodo: 'SISTEMA',
+          autorizado: true
+        }).catch(console.error)
+      } else {
+        await registrarAcceso({
+          salon_id: sol.salon_id,
+          profesor_id: sol.profesor_id,
+          tipo: 'DENEGADO',
+          metodo: 'SISTEMA',
+          autorizado: false,
+          motivo_denegacion: respuestaSol || 'Rechazado por un administrador'
+        }).catch(console.error)
+      }
       setModalSol(null); setRespuestaSol('')
     } finally { setProcesandoSol(false) }
   }
@@ -453,7 +474,11 @@ export default function AdminDashboardPage() {
                   Solicitudes de Salón
                   {pendientes > 0 && <span className="notif-badge" style={{ position: 'static', fontSize: '13px', padding: '2px 8px' }}>{pendientes} pendiente{pendientes > 1 ? 's' : ''}</span>}
                 </h3>
-                {solicitudes.length === 0 ? (
+                {errorSol && <div className="hor-error-banner" style={{marginBottom: '16px'}}>{errorSol}</div>}
+                
+                {loadingS ? (
+                  <div style={{ textAlign: 'center', padding: '40px' }}><div className="hor-spinner" style={{ margin: '0 auto 12px' }} /><p style={{ color: 'var(--color-on-surface-variant)' }}>Cargando solicitudes...</p></div>
+                ) : solicitudes.length === 0 ? (
                   <div className="dash-card" style={{ textAlign: 'center', padding: '60px' }}>
                     <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-on-surface-variant)', display: 'block', marginBottom: '16px' }}>inbox</span>
                     <p style={{ color: 'var(--color-on-surface-variant)' }}>No hay solicitudes.</p>

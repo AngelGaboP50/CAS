@@ -1,8 +1,8 @@
 // src/pages/SalonesPage.tsx
 // Vista del PROFESOR: consulta de disponibilidad de salones en tiempo real
 
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAulas, type EstadoAula } from '../hooks/useAulas'
 import { useSolicitudes } from '../hooks/useSolicitudes'
 import './DashboardPage.css'
@@ -29,6 +29,7 @@ function getUsuario() {
 
 export default function SalonesPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const usuario = getUsuario()
   const { aulas, loading } = useAulas()
   const { crearSolicitud } = useSolicitudes(usuario?.id)
@@ -44,6 +45,21 @@ export default function SalonesPage() {
     filtro === 'TODOS' ? aulas : aulas.filter(a => a.estado === filtro),
     [aulas, filtro]
   )
+
+  useEffect(() => {
+    if (aulas.length > 0) {
+      const authTarget = searchParams.get('solicitar')
+      if (authTarget) {
+        const aulaSolicitada = aulas.find(a => a.id === authTarget || a.label.includes('3'))
+        if (aulaSolicitada) {
+          setModalSolicitud({ salonId: aulaSolicitada.id, nombre: aulaSolicitada.label })
+        } else if (authTarget === 'demo') {
+          setModalSolicitud({ salonId: 'uuid-1234', nombre: 'Salón 3' })
+        }
+        setSearchParams({})
+      }
+    }
+  }, [aulas, searchParams, setSearchParams])
 
   const handleSolicitar = async (e: React.FormEvent) => {
     e.preventDefault()

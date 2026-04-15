@@ -11,6 +11,8 @@ import SalonesPage from './pages/SalonesPage'
 import HistorialAccesosPage from './pages/HistorialAccesosPage'
 import SolicitudesPage from './pages/SolicitudesPage'
 import NotificacionesPage from './pages/NotificacionesPage'
+import SimulacionPuertaPage from './pages/SimulacionPuertaPage'
+import QrAccessPage from './pages/QrAccessPage'
 import ProtectedRoute from './guards/ProtectedRoute'
 import './App.css'
 
@@ -23,6 +25,8 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/simulacion/:salon_id?" element={<SimulacionPuertaPage />} />
+        <Route path="/qr-access/:salon_id?" element={<QrAccessPage />} />
 
         {/* Profesor */}
         <Route path="/dashboard" element={

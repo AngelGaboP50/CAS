@@ -48,7 +48,13 @@ function LoginPage() {
         if (userData?.tipo === 'admin') {
           navigate('/admin')
         } else {
-          navigate('/dashboard')
+          const returnUrl = sessionStorage.getItem('returnUrl')
+          if (returnUrl) {
+            sessionStorage.removeItem('returnUrl')
+            navigate(returnUrl)
+          } else {
+            navigate('/dashboard')
+          }
         }
       }
     } catch (err: any) {

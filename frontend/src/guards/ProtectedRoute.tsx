@@ -23,6 +23,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   // Sin sesión → login
   if (!usuario) {
+    sessionStorage.setItem('returnUrl', window.location.pathname + window.location.search)
     return <Navigate to="/login" replace />
   }
 
