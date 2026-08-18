@@ -1,12 +1,12 @@
 // src/pages/AdminDashboardPage.tsx — REEMPLAZA el archivo actual completo
 // Agrega: tab de Solicitudes, tab de Historial, gestión de Horarios, notificaciones navegables
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 import './DashboardPage.css'
 import { InteractiveMap } from '../components/InteractiveMap'
-import { useAulas, type EstadoAula } from '../hooks/useAulas'
+import { useAulas } from '../hooks/useAulas'
 import { useNotificaciones } from '../hooks/useNotificaciones'
 import { useSolicitudes } from '../hooks/useSolicitudes'
 import { useAccesos } from '../hooks/useAccesos'
@@ -64,7 +64,7 @@ export default function AdminDashboardPage() {
   const [formPassword, setFormPassword] = useState('')
 
   // ── Salones ──
-  const { aulas, updateEstadoAula } = useAulas()
+  const { updateEstadoAula } = useAulas()
 
   // ── Solicitudes ──
   const solHook = useSolicitudes(undefined, true)
@@ -84,24 +84,115 @@ export default function AdminDashboardPage() {
   type EstadoHorario = 'pendiente' | 'autorizado' | 'rechazado'
   const [horarioFilter, setHorarioFilter] = useState<EstadoHorario | 'todos'>('pendiente')
   const [previewImgUrl, setPreviewImgUrl] = useState<string | null>(null)
+  const [loadingHorarios, setLoadingHorarios] = useState(false)
+  const [modalAsignarOpen, setModalAsignarOpen] = useState(false)
+  const [asignarProfesorId, setAsignarProfesorId] = useState('')
+  const [asignarFile, setAsignarFile] = useState<File | null>(null)
+  const [asignando, setAsignando] = useState(false)
+  const [asignarError, setAsignarError] = useState<string | null>(null)
+
   const [horariosData, setHorariosData] = useState<Array<{
-    id: string; profesorNombre: string; profesorCorreo: string
-    imagenUrl: string; estado: EstadoHorario; fecha: string
-  }>>([
-    { id: '1', profesorNombre: 'Ana López', profesorCorreo: 'ana.lopez@uteq.edu.mx',
-      imagenUrl: 'https://placehold.co/400x300/1e1f26/92ccff?text=Horario+Ana',
-      estado: 'pendiente', fecha: new Date(Date.now() - 1000*60*30).toISOString() },
-    { id: '2', profesorNombre: 'Carlos Mendoza', profesorCorreo: 'c.mendoza@uteq.edu.mx',
-      imagenUrl: 'https://placehold.co/400x300/1e1f26/92ccff?text=Horario+Carlos',
-      estado: 'pendiente', fecha: new Date(Date.now() - 1000*60*60*2).toISOString() },
-    { id: '3', profesorNombre: 'Marta Ramírez', profesorCorreo: 'm.ramirez@uteq.edu.mx',
-      imagenUrl: 'https://placehold.co/400x300/1e1f26/4ae183?text=Horario+Marta',
-      estado: 'autorizado', fecha: new Date(Date.now() - 1000*60*60*24).toISOString() },
-  ])
-  const handleAutorizarHorario = (id: string) =>
-    setHorariosData(prev => prev.map(h => h.id === id ? { ...h, estado: 'autorizado' as EstadoHorario } : h))
-  const handleRechazarHorario = (id: string) =>
-    setHorariosData(prev => prev.map(h => h.id === id ? { ...h, estado: 'rechazado' as EstadoHorario } : h))
+    id: string; profesorId?: number; profesorNombre: string; profesorCorreo: string
+    imagenUrl: string; estado: EstadoHorario; fecha: string; subidoPor?: string
+  }>>([])
+
+  const fetchHorarios = useCallback(async () => {
+    setLoadingHorarios(true)
+    try {
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const res = await fetch(`${API}/api/horarios`)
+      if (res.ok) {
+        const data = await res.json()
+        const formatted = data.map((h: any) => ({
+          id: String(h.id),
+          profesorId: h.profesor_id,
+          profesorNombre: h.profesor_nombre || 'Profesor',
+          profesorCorreo: h.profesor_correo || '',
+          imagenUrl: h.imagen_url.startsWith('http') ? h.imagen_url : `${API}${h.imagen_url}`,
+          estado: h.estado as EstadoHorario,
+          fecha: h.fecha_subida,
+          subidoPor: h.subido_por
+        }))
+        setHorariosData(formatted)
+      }
+    } catch (err) {
+      console.error('Error al cargar horarios:', err)
+    } finally {
+      setLoadingHorarios(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchHorarios()
+  }, [fetchHorarios])
+
+  const handleAutorizarHorario = async (id: string) => {
+    try {
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const res = await fetch(`${API}/api/horarios/${id}/estado`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'autorizado', admin_id: usuario?.id })
+      })
+      if (res.ok) {
+        await fetchHorarios()
+      }
+    } catch (err) {
+      console.error('Error al autorizar horario:', err)
+    }
+  }
+
+  const handleRechazarHorario = async (id: string) => {
+    try {
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const res = await fetch(`${API}/api/horarios/${id}/estado`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'rechazado', admin_id: usuario?.id })
+      })
+      if (res.ok) {
+        await fetchHorarios()
+      }
+    } catch (err) {
+      console.error('Error al rechazar horario:', err)
+    }
+  }
+
+  const handleAsignarHorarioSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!asignarProfesorId || !asignarFile) {
+      setAsignarError('Por favor selecciona un profesor y una imagen.')
+      return
+    }
+    setAsignando(true)
+    setAsignarError(null)
+    try {
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const formData = new FormData()
+      formData.append('imagen', asignarFile)
+      formData.append('profesor_id', asignarProfesorId)
+      if (usuario?.id) {
+        formData.append('admin_id', String(usuario.id))
+      }
+
+      const res = await fetch(`${API}/api/horarios/admin-asignar`, {
+        method: 'POST',
+        body: formData
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al asignar horario')
+
+      setModalAsignarOpen(false)
+      setAsignarFile(null)
+      setAsignarProfesorId('')
+      await fetchHorarios()
+    } catch (err: any) {
+      setAsignarError(err.message || 'Error al asignar horario')
+    } finally {
+      setAsignando(false)
+    }
+  }
+
   const horariosFiltrados = horariosData.filter(h => horarioFilter === 'todos' ? true : h.estado === horarioFilter)
   const horariosPendientesCount = horariosData.filter(h => h.estado === 'pendiente').length
 
@@ -145,12 +236,6 @@ export default function AdminDashboardPage() {
   }
 
   const handleLogout = () => { sessionStorage.removeItem('usuario'); navigate('/login', { replace: true }) }
-
-  const handleUpdateEstado = async (id: string, estadoActual: EstadoAula) => {
-    const estados: EstadoAula[] = ['LIBRE', 'EN_CLASE', 'ALERTA', 'EXCEPCION', 'NO_DISPONIBLE']
-    const next = estados[(estados.indexOf(estadoActual) + 1) % estados.length]
-    try { await updateEstadoAula(id, next) } catch { alert('Error al actualizar estado') }
-  }
 
   const openAddForm = () => { setIsEditing(true); setEditingId(null); setFormName(''); setFormEmail(''); setFormType('profesor'); setFormPassword('') }
   const openEditForm = (u: any) => { 
@@ -418,13 +503,23 @@ export default function AdminDashboardPage() {
             {activeTab === 'horarios' && (
               <div className="dash-card" style={{ padding: '30px', margin: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-                  <h3 className="dash-card-title" style={{ fontSize: '24px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                    <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '28px' }}>calendar_month</span>
-                    Horarios de Profesores
-                  </h3>
-                  <span style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
-                    {horariosPendientesCount} pendiente{horariosPendientesCount !== 1 ? 's' : ''} de autorización
-                  </span>
+                  <div>
+                    <h3 className="dash-card-title" style={{ fontSize: '24px', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 6px 0' }}>
+                      <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '28px' }}>calendar_month</span>
+                      Horarios de Profesores
+                    </h3>
+                    <span style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
+                      {horariosPendientesCount} pendiente{horariosPendientesCount !== 1 ? 's' : ''} de autorización
+                    </span>
+                  </div>
+                  <button
+                    className="admin-btn-authorize"
+                    onClick={() => { setModalAsignarOpen(true); setAsignarError(null); }}
+                    style={{ padding: '10px 20px', borderRadius: '12px' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>upload_file</span>
+                    Subir Horario a Profesor
+                  </button>
                 </div>
 
                 {/* Filtros */}
@@ -438,31 +533,54 @@ export default function AdminDashboardPage() {
                   ))}
                 </div>
 
-                {horariosFiltrados.length === 0 ? (
+                {loadingHorarios ? (
+                  <div style={{ textAlign: 'center', padding: '40px' }}>
+                    <div className="hor-spinner" style={{ margin: '0 auto 12px' }} />
+                    <p style={{ color: 'var(--color-on-surface-variant)' }}>Cargando horarios...</p>
+                  </div>
+                ) : horariosFiltrados.length === 0 ? (
                   <div className="admin-horarios-empty">
                     <span className="material-symbols-outlined">calendar_month</span>
-                    <p>No hay solicitudes {horarioFilter !== 'todos' ? `con estado "${horarioFilter}"` : ''}.</p>
+                    <p>No hay horarios {horarioFilter !== 'todos' ? `con estado "${horarioFilter}"` : ''}.</p>
                   </div>
                 ) : (
                   <div className="admin-horarios-list">
                     {horariosFiltrados.map(h => (
                       <div key={h.id} className="admin-horario-card">
-                        <img src={h.imagenUrl} alt={`Horario ${h.profesorNombre}`} className="admin-horario-thumb"
-                          onClick={() => setPreviewImgUrl(h.imagenUrl)} title="Clic para ampliar" />
+                        <div
+                          className="admin-horario-thumb-container"
+                          onClick={() => setPreviewImgUrl(h.imagenUrl)}
+                          title="Clic para ampliar horario"
+                        >
+                          <img src={h.imagenUrl} alt={`Horario ${h.profesorNombre}`} className="admin-horario-thumb" />
+                          <div className="admin-horario-thumb-overlay">
+                            <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>zoom_in</span>
+                          </div>
+                        </div>
+
                         <div className="admin-horario-info">
                           <p className="admin-horario-name">{h.profesorNombre}</p>
-                          <p className="admin-horario-meta">{h.profesorCorreo} &nbsp;·&nbsp;
-                            {new Date(h.fecha).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          <p className="admin-horario-meta">
+                            <span>{h.profesorCorreo}</span>
+                            <span>•</span>
+                            <span>{new Date(h.fecha).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                            {h.subidoPor === 'admin' && (
+                              <>
+                                <span>•</span>
+                                <span style={{ color: 'var(--color-primary)', fontSize: '11px', fontWeight: 600 }}>Asignado por Admin</span>
+                              </>
+                            )}
                           </p>
-                          <div style={{ marginTop: '8px' }}>
+                          <div className="admin-horario-badges">
                             <span className={`admin-status-chip admin-status-chip--${h.estado}`}>
-                              <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>
                                 {h.estado === 'pendiente' ? 'pending' : h.estado === 'autorizado' ? 'check_circle' : 'cancel'}
                               </span>
                               {h.estado.charAt(0).toUpperCase() + h.estado.slice(1)}
                             </span>
                           </div>
                         </div>
+
                         <div className="admin-horario-actions">
                           {h.estado === 'pendiente' ? (
                             <>
@@ -472,12 +590,13 @@ export default function AdminDashboardPage() {
                               <button className="admin-btn-reject" onClick={() => handleRechazarHorario(h.id)}>
                                 <span className="material-symbols-outlined">cancel</span>Rechazar
                               </button>
+                              <button className="admin-btn-view" onClick={() => setPreviewImgUrl(h.imagenUrl)}>
+                                <span className="material-symbols-outlined">visibility</span>Ver
+                              </button>
                             </>
                           ) : (
-                            <button className="admin-btn-authorize"
-                              style={{ background: 'transparent', border: '1px solid var(--color-outline-variant)', color: 'var(--color-on-surface-variant)' }}
-                              onClick={() => setPreviewImgUrl(h.imagenUrl)}>
-                              <span className="material-symbols-outlined">visibility</span>Ver
+                            <button className="admin-btn-view" onClick={() => setPreviewImgUrl(h.imagenUrl)}>
+                              <span className="material-symbols-outlined">visibility</span>Ver Horario
                             </button>
                           )}
                         </div>
@@ -758,6 +877,77 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Asignar Horario a Profesor */}
+      {modalAsignarOpen && (
+        <div className="hor-overlay" onClick={e => e.target === e.currentTarget && setModalAsignarOpen(false)}>
+          <div className="hor-modal">
+            <div className="hor-modal-header">
+              <div className="hor-modal-title-row">
+                <span className="material-symbols-outlined hor-modal-icon" style={{ color: 'var(--color-secondary)' }}>
+                  upload_file
+                </span>
+                <h2 className="hor-modal-title">Subir Horario a Profesor</h2>
+              </div>
+              <button className="hor-close-btn" onClick={() => setModalAsignarOpen(false)}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleAsignarHorarioSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {asignarError && (
+                <div className="hor-error-banner">
+                  <span className="material-symbols-outlined">error</span>{asignarError}
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>Profesor</label>
+                <select
+                  value={asignarProfesorId}
+                  onChange={e => setAsignarProfesorId(e.target.value)}
+                  required
+                  style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+                >
+                  <option value="">-- Selecciona un profesor --</option>
+                  {usuarios.filter(u => u.rol === 1 || u.tipo === 'profesor').map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.nombre} ({u.correo})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>Archivo de Horario (JPG o PNG)</label>
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp"
+                  required
+                  onChange={e => setAsignarFile(e.target.files?.[0] || null)}
+                  style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button type="button" className="hor-cancel-btn" onClick={() => setModalAsignarOpen(false)} disabled={asignando}>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="dash-logout-btn"
+                  disabled={asignando}
+                  style={{ borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)', background: 'rgba(74,225,131,.1)' }}
+                >
+                  {asignando ? (
+                    <><div className="hor-btn-spinner" />Subiendo...</>
+                  ) : (
+                    <><span className="material-symbols-outlined">upload</span>Asignar y Autorizar</>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

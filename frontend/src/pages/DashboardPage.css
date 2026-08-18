@@ -991,4 +991,323 @@
   background: rgba(255, 107, 122, .12);
   color: #ff6b7a;
   border-color: rgba(255, 107, 122, .3);
+}
+
+/* ─── Admin Horarios Panel ───────────────────────────────────── */
+.admin-horarios-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-horario-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 24px;
+  border-radius: 14px;
+  background: var(--color-surface-container-high);
+  border: 1px solid var(--color-outline-variant);
+  transition: all .25s ease;
+  position: relative;
+}
+
+.admin-horario-card:hover {
+  border-color: rgba(146, 204, 255, .35);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, .25);
+}
+
+.admin-horario-thumb-container {
+  position: relative;
+  width: 90px;
+  height: 70px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--color-outline-variant);
+  background: #111319;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.admin-horario-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .3s ease;
+  display: block;
+}
+
+.admin-horario-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .2s ease;
+  color: #fff;
+}
+
+.admin-horario-thumb-container:hover .admin-horario-thumb-overlay {
+  opacity: 1;
+}
+
+.admin-horario-thumb-container:hover .admin-horario-thumb {
+  transform: scale(1.08);
+}
+
+.admin-horario-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-horario-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  margin: 0 0 6px;
+}
+
+.admin-horario-meta {
+  font-size: 13px;
+  color: var(--color-on-surface-variant);
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-horario-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+
+.admin-status-chip--pending {
+  background: rgba(251, 211, 141, .12);
+  color: #fbd38d;
+  border: 1px solid rgba(251, 211, 141, .3);
+}
+
+.admin-status-chip--authorized {
+  background: rgba(74, 225, 131, .12);
+  color: #4ae183;
+  border: 1px solid rgba(74, 225, 131, .3);
+}
+
+.admin-status-chip--rejected {
+  background: rgba(255, 107, 122, .1);
+  color: #ff6b7a;
+  border: 1px solid rgba(255, 107, 122, .3);
+}
+
+.admin-horario-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.admin-btn-authorize {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: 1px solid rgba(74, 225, 131, .4);
+  background: rgba(74, 225, 131, .1);
+  color: #4ae183;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.admin-btn-authorize:hover {
+  background: rgba(74, 225, 131, .22);
+  border-color: #4ae183;
+  box-shadow: 0 0 14px rgba(74, 225, 131, .3);
+}
+
+.admin-btn-authorize .material-symbols-outlined,
+.admin-btn-reject .material-symbols-outlined,
+.admin-btn-view .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.admin-btn-reject {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 107, 122, .4);
+  background: rgba(255, 107, 122, .08);
+  color: #ff6b7a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.admin-btn-reject:hover {
+  background: rgba(255, 107, 122, .2);
+  border-color: #ff6b7a;
+  box-shadow: 0 0 14px rgba(255, 107, 122, .3);
+}
+
+.admin-btn-view {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  border: 1px solid var(--color-outline-variant);
+  background: rgba(255, 255, 255, .04);
+  color: var(--color-on-surface);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.admin-btn-view:hover {
+  background: rgba(255, 255, 255, .09);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Tabs within admin horarios */
+.admin-hor-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.admin-hor-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container);
+  color: var(--color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.admin-hor-tab:hover {
+  border-color: rgba(146, 204, 255, .4);
+  color: var(--color-primary);
+  background: rgba(146, 204, 255, .05);
+}
+
+.admin-hor-tab--active {
+  background: rgba(146, 204, 255, .12);
+  border-color: rgba(146, 204, 255, .45);
+  color: var(--color-primary);
+  font-weight: 600;
+  box-shadow: 0 0 15px rgba(146, 204, 255, .15);
+}
+
+.admin-hor-tab .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.admin-hor-tab-count {
+  background: rgba(251, 211, 141, .2);
+  color: #fbd38d;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+
+/* Empty state for horarios */
+.admin-horarios-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--color-on-surface-variant);
+  text-align: center;
+  background: rgba(255, 255, 255, .01);
+  border-radius: 14px;
+  border: 1px dashed var(--color-outline-variant);
+}
+
+.admin-horarios-empty .material-symbols-outlined {
+  font-size: 52px;
+  opacity: .4;
+}
+
+.admin-horarios-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Preview Modal overlay (admin view image) */
+.admin-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2500;
+  padding: 30px;
+  box-sizing: border-box;
+  animation: fadeIn .2s ease;
+}
+
+.admin-preview-img {
+  max-width: 90vw;
+  max-height: 85vh;
+  border-radius: 14px;
+  border: 1px solid var(--color-outline-variant);
+  object-fit: contain;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .8);
+}
+
+.admin-preview-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: rgba(30, 31, 38, .9);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 12px;
+  color: var(--color-on-surface-variant);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  transition: all .2s ease;
+}
+
+.admin-preview-close:hover {
+  border-color: #ff6b7a;
+  color: #ff6b7a;
+  transform: scale(1.05);
 }

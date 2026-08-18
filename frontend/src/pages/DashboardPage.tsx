@@ -12,9 +12,6 @@ import { useAulas } from '../hooks/useAulas'
 import { useHorarios } from '../hooks/useHorarios'
 import './DashboardPage.css'
 
-const BUCKET = 'files'
-const HORARIOS_FOLDER = 'imagenes'
-
 interface ResultadoQR {
   autorizado: boolean
   motivo: string
@@ -67,9 +64,19 @@ function DashboardPage() {
     setLoadingHorario(true)
     setErrorMsg(null)
     try {
-      // TODO: Llamar API para obtener horario
-      const estadoGuardado = localStorage.getItem(`horario_estado_${userId}`) as 'pendiente' | 'autorizado' | 'rechazado' | null
-      setHorarioEstado(estadoGuardado ?? 'pendiente')
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const res = await fetch(`${API}/api/horarios/mi-horario?usuario_id=${userId}`)
+      const data = await res.json()
+      if (data.horario) {
+        const fullUrl = data.horario.imagen_url.startsWith('http')
+          ? data.horario.imagen_url
+          : `${API}${data.horario.imagen_url}`
+        setHorarioUrl(fullUrl)
+        setHorarioEstado(data.horario.estado)
+      } else {
+        setHorarioUrl(null)
+        setHorarioEstado(null)
+      }
     } catch {
       setErrorMsg('No se pudo cargar el horario. Intenta de nuevo.')
     } finally {
@@ -77,7 +84,9 @@ function DashboardPage() {
     }
   }, [userId])
 
-  useEffect(() => { if (modalOpen) fetchHorario() }, [modalOpen, fetchHorario])
+  useEffect(() => {
+    fetchHorario()
+  }, [fetchHorario])
 
   // ── Subir imagen de horario ──
   const handleFileSelect = async (file: File) => {
@@ -92,17 +101,28 @@ function DashboardPage() {
     setErrorMsg(null)
     setUploading(true)
     try {
-      // TODO: Llamar API para subir horario
-      localStorage.setItem(`horario_estado_${usuario.id}`, 'pendiente')
-      setHorarioEstado('pendiente')
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const formData = new FormData()
+      formData.append('imagen', file)
+      formData.append('usuario_id', String(usuario.id))
+
+      const res = await fetch(`${API}/api/horarios/upload`, {
+        method: 'POST',
+        body: formData
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al subir el horario')
+      }
+
       await fetchHorario()
       await notificarAdmins(
         'Horario Pendiente de Revisión',
         `El profesor ${usuario.nombre} ha subido su horario y está esperando autorización.`,
         'info'
       )
-    } catch {
-      setErrorMsg('Error al subir el archivo. Verifica los permisos del bucket.')
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al subir el archivo.')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -118,15 +138,19 @@ function DashboardPage() {
 
   // ── Eliminar imagen de horario ──
   const handleDeleteHorario = async () => {
-    if (!horarioUrl) return
+    if (!userId) return
     setDeleting(true)
     setErrorMsg(null)
     try {
-      // TODO: API eliminar
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const resGet = await fetch(`${API}/api/horarios/mi-horario?usuario_id=${userId}`)
+      const dataGet = await resGet.json()
+      if (dataGet.horario?.id) {
+        await fetch(`${API}/api/horarios/${dataGet.horario.id}`, { method: 'DELETE' })
+      }
       setHorarioUrl(null)
       setHorarioEstado(null)
       setDeleteConfirm(false)
-      localStorage.removeItem(`horario_estado_${usuario.id}`)
       await notificarAdmins(
         'Horario Eliminado',
         `El profesor ${usuario.nombre} ha eliminado su archivo de horario.`,

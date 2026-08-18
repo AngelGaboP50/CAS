@@ -1,10 +1,12 @@
 require('dotenv').config()
 const express = require('express')
 const cors    = require('cors')
+const path    = require('path')
 
 const authRoutes     = require('./routes/auth')
 const usuariosRoutes = require('./routes/usuarios')
 const salonesRoutes  = require('./routes/salones')
+const horariosRoutes = require('./routes/horarios')
 
 const app  = express()
 const PORT = process.env.PORT || 3001
@@ -23,10 +25,14 @@ app.use(cors({
 }))
 app.use(express.json())
 
+// Servir archivos estáticos subidos (imágenes de horarios, etc.)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+
 // ─── RUTAS ────────────────────────────────────────────────────────────────────
 app.use('/api/auth',     authRoutes)
 app.use('/api/usuarios', usuariosRoutes)
 app.use('/api/salones',  salonesRoutes)
+app.use('/api/horarios', horariosRoutes)
 
 // Ruta de salud (para verificar que el backend está corriendo)
 app.get('/api/health', (req, res) => {
