@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { supabase } from '../supabaseClient'
+
 import './DashboardPage.css'
 import { InteractiveMap } from '../components/InteractiveMap'
 import { useAulas, type EstadoAula } from '../hooks/useAulas'

@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Scanner } from '@yudiel/react-qr-scanner'
-import { supabase } from '../supabaseClient'
+
 import { notificarAdmins } from '../hooks/useNotificaciones'
 import { useAccesos } from '../hooks/useAccesos'
 import { useAulas } from '../hooks/useAulas'
@@ -67,24 +67,9 @@ function DashboardPage() {
     setLoadingHorario(true)
     setErrorMsg(null)
     try {
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .list(`${HORARIOS_FOLDER}/${userId}`, { limit: 5 })
-      if (error) throw error
-      const archivo = data?.find(f => f.name.startsWith('horario.'))
-      if (archivo) {
-        const { data: urlData } = supabase.storage
-          .from(BUCKET)
-          .getPublicUrl(`${HORARIOS_FOLDER}/${userId}/${archivo.name}`)
-        setHorarioUrl(`${urlData.publicUrl}?t=${Date.now()}`)
-        // Leer el estado guardado localmente
-        const estadoGuardado = localStorage.getItem(`horario_estado_${userId}`) as 'pendiente' | 'autorizado' | 'rechazado' | null
-        setHorarioEstado(estadoGuardado ?? 'pendiente')
-      } else {
-        setHorarioUrl(null)
-        setHorarioEstado(null)
-        localStorage.removeItem(`horario_estado_${userId}`)
-      }
+      // TODO: Llamar API para obtener horario
+      const estadoGuardado = localStorage.getItem(`horario_estado_${userId}`) as 'pendiente' | 'autorizado' | 'rechazado' | null
+      setHorarioEstado(estadoGuardado ?? 'pendiente')
     } catch {
       setErrorMsg('No se pudo cargar el horario. Intenta de nuevo.')
     } finally {
@@ -107,13 +92,7 @@ function DashboardPage() {
     setErrorMsg(null)
     setUploading(true)
     try {
-      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-      const path = `${HORARIOS_FOLDER}/${usuario.id}/horario.${ext}`
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, file, { upsert: true, contentType: file.type })
-      if (error) throw error
-      // Marcar como PENDIENTE de autorización
+      // TODO: Llamar API para subir horario
       localStorage.setItem(`horario_estado_${usuario.id}`, 'pendiente')
       setHorarioEstado('pendiente')
       await fetchHorario()
@@ -143,15 +122,7 @@ function DashboardPage() {
     setDeleting(true)
     setErrorMsg(null)
     try {
-      const { data, error: listErr } = await supabase.storage
-        .from(BUCKET)
-        .list(`${HORARIOS_FOLDER}/${usuario.id}`)
-      if (listErr) throw listErr
-      const paths = (data ?? []).map(f => `${HORARIOS_FOLDER}/${usuario.id}/${f.name}`)
-      if (paths.length > 0) {
-        const { error: removeErr } = await supabase.storage.from(BUCKET).remove(paths)
-        if (removeErr) throw removeErr
-      }
+      // TODO: API eliminar
       setHorarioUrl(null)
       setHorarioEstado(null)
       setDeleteConfirm(false)
@@ -186,13 +157,8 @@ function DashboardPage() {
 
       const salonId = rawValue.replace('SALON:', '').trim()
 
-      const { data: salonData } = await supabase
-        .from('salones')
-        .select('nombre')
-        .eq('id', salonId)
-        .single()
-
-      const nombreSalon = salonData?.nombre ?? salonId
+      // TODO: API
+      const nombreSalon = salonId
 
       const resultado = await validarAccesoQR(usuario.id, salonId)
 
@@ -214,7 +180,7 @@ function DashboardPage() {
       })
 
       if (resultado.autorizado) {
-        await supabase.from('salones').update({ estado: 'EN_CLASE', activo: true }).eq('id', salonId)
+        // TODO: API actualizar
       }
 
       if (!resultado.autorizado) {

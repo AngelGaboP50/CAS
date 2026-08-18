@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { supabase } from '../supabaseClient'
+
 import './DashboardPage.css' // Reusamos estilos base
 
 export default function SimulacionPuertaPage() {
@@ -14,15 +14,10 @@ export default function SimulacionPuertaPage() {
 
   useEffect(() => {
     async function fetchEstado() {
+      // TODO: Implementar llamada a API para obtener estado del salón
       if (!salonIdReal || salonIdReal === 'demo') {
-        const { data } = await supabase.from('salones').select('id, nombre').ilike('nombre', '%3%').limit(1).single()
-        if (data) {
-          setSalonIdReal(data.id)
-          setSalonNombre(data.nombre)
-        }
-      } else {
-        const { data } = await supabase.from('salones').select('nombre').eq('id', salonIdReal).single()
-        if (data) setSalonNombre(data.nombre)
+        setSalonIdReal('demo_id')
+        setSalonNombre('Salón Demo')
       }
     }
     fetchEstado()
@@ -32,39 +27,10 @@ export default function SimulacionPuertaPage() {
     if (!salonIdReal) return
 
     async function fetchEstado() {
-      const { data } = await supabase
-        .from('solicitudes_salon')
-        .select('*, profesor:usuarios!profesor_id(nombre)')
-        .eq('salon_id', salonIdReal)
-        .eq('estado', 'APROBADA')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-      
-      if (data) {
-        setEstadoPuerta('ABIERTA')
-        setSolicitudActiva(data)
-      } else {
-        setEstadoPuerta('CERRADA')
-        setSolicitudActiva(null)
-      }
+      // TODO: Implementar llamada a API
     }
     
     fetchEstado()
-
-    // Escuchar cambios en la tabla solicitudes_salon para este salón
-    const canal = supabase
-      .channel('puerta_sim_' + salonIdReal)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'solicitudes_salon', filter: `salon_id=eq.${salonIdReal}` },
-        () => { fetchEstado() }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(canal)
-    }
   }, [salonIdReal])
 
   useEffect(() => {
@@ -99,8 +65,7 @@ export default function SimulacionPuertaPage() {
 
   const handleCerrar = async () => {
     if (!solicitudActiva) return
-    await supabase.from('solicitudes_salon').update({ estado: 'CANCELADA' }).eq('id', solicitudActiva.id)
-    await supabase.from('salones').update({ estado: 'LIBRE' }).eq('id', salonIdReal)
+    // TODO: Implementar llamada a API
     setEstadoPuerta('CERRADA')
     setSolicitudActiva(null)
   }

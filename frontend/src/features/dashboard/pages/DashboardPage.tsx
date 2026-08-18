@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Scanner } from '@yudiel/react-qr-scanner'
-import { supabase } from '../../../core/config/supabaseClient'
+
 import { useNotificaciones, notificarAdmins } from '../../notificaciones/hooks/useNotificaciones'
 import '../../../shared/styles/DashboardPage.css'
 
@@ -53,34 +53,15 @@ function DashboardPage() {
     }
   }, [usuario, navigate])
 
-  // ── Cargar horario existente desde Supabase ──────────────────────
+  // ── Cargar horario existente ──────────────────────
   const fetchHorario = useCallback(async () => {
     if (!userId) return
     setLoadingHorario(true)
     setErrorMsg(null)
     try {
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .list(`${HORARIOS_FOLDER}/${userId}`, { limit: 5 })
-
-      if (error) throw error
-
-      // Buscar archivo con nombre "horario.*"
-      const archivo = data?.find(f => f.name.startsWith('horario.'))
-      if (archivo) {
-        const { data: urlData } = supabase.storage
-          .from(BUCKET)
-          .getPublicUrl(`${HORARIOS_FOLDER}/${userId}/${archivo.name}`)
-        // Agregar timestamp para evitar caché
-        setHorarioUrl(`${urlData.publicUrl}?t=${Date.now()}`)
-        // Leer el estado guardado localmente
-        const estadoGuardado = localStorage.getItem(`horario_estado_${userId}`) as 'pendiente' | 'autorizado' | 'rechazado' | null
-        setHorarioEstado(estadoGuardado ?? 'pendiente')
-      } else {
-        setHorarioUrl(null)
-        setHorarioEstado(null)
-        localStorage.removeItem(`horario_estado_${userId}`)
-      }
+      // TODO: API
+      const estadoGuardado = localStorage.getItem(`horario_estado_${userId}`) as 'pendiente' | 'autorizado' | 'rechazado' | null
+      setHorarioEstado(estadoGuardado ?? 'pendiente')
     } catch (err: any) {
       setErrorMsg('No se pudo cargar el horario. Intenta de nuevo.')
       console.error(err)
@@ -112,7 +93,7 @@ function DashboardPage() {
     setModalOpen(false)
   }
 
-  // ── Subir horario a Supabase Storage ────────────────────────────
+  // ── Subir horario a Storage ────────────────────────────
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       setErrorMsg('Solo se permiten imágenes PNG o JPG.')
@@ -127,17 +108,7 @@ function DashboardPage() {
     setUploading(true)
 
     try {
-      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-      const path = `${HORARIOS_FOLDER}/${usuario.id}/horario.${ext}`
-
-      // upsert: sobreescribe si ya existe
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, file, { upsert: true, contentType: file.type })
-
-      if (error) throw error
-
-      // Marcar el horario como PENDIENTE de autorización
+      // TODO: API subida
       localStorage.setItem(`horario_estado_${usuario.id}`, 'pendiente')
       setHorarioEstado('pendiente')
 
@@ -171,30 +142,14 @@ function DashboardPage() {
     if (file) handleFileSelect(file)
   }
 
-  // ── Eliminar horario de Supabase Storage ────────────────────────
+  // ── Eliminar horario de Storage ────────────────────────
   const handleDeleteHorario = async () => {
     if (!horarioUrl) return
     setDeleting(true)
     setErrorMsg(null)
 
     try {
-      // Listar y borrar todos los archivos dentro de la carpeta del usuario
-      const { data, error: listErr } = await supabase.storage
-        .from(BUCKET)
-        .list(`${HORARIOS_FOLDER}/${usuario.id}`)
-
-      if (listErr) throw listErr
-
-      const paths = (data ?? []).map(
-        f => `${HORARIOS_FOLDER}/${usuario.id}/${f.name}`
-      )
-      if (paths.length > 0) {
-        const { error: removeErr } = await supabase.storage
-          .from(BUCKET)
-          .remove(paths)
-        if (removeErr) throw removeErr
-      }
-
+      // TODO: API eliminar
       setHorarioUrl(null)
       setHorarioEstado(null)
       setDeleteConfirm(false)

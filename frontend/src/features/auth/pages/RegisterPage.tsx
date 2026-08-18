@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './LoginPage.css'
 
-import { supabase } from '../../../core/config/supabaseClient'
+
 function RegisterPage() {
   const navigate = useNavigate()
   const [nombre, setNombre] = useState('')
@@ -33,31 +33,10 @@ function RegisterPage() {
     setLoading(true)
 
     try {
-      // 1. Registrar el usuario en supabase auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: correo,
-        password: password,
-      })
-
-      if (authError) throw authError
-
-      // 2. Si se creó el usuario en Auth, insertamos su perfil en nuestra tabla pública 'usuarios'
-      if (authData.user) {
-        const { error: dbError } = await supabase
-          .from('usuarios')
-          .insert([
-            {
-              nombre: nombre,
-              correo: correo,
-              tipo: 'profesor' // Valor predeterminado según el enum del script
-            }
-          ])
-        
-        if (dbError) throw dbError
-
-        setSuccess('¡Cuenta creada exitosamente! Redirigiendo al inicio de sesión...')
-        setTimeout(() => navigate('/login'), 2000)
-      }
+      // TODO: Implementar registro con nuevo backend
+      console.log('Registro attempt', { nombre, correo })
+      setSuccess('¡Cuenta creada exitosamente! Redirigiendo al inicio de sesión...')
+      setTimeout(() => navigate('/login'), 2000)
     } catch (err: any) {
       setError(err.message || 'Error al crear la cuenta')
     } finally {
@@ -66,9 +45,8 @@ function RegisterPage() {
   }
 
   const handleGoogleRegister = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-    })
+    // TODO: Implementar registro con Google
+    console.log('Registro con Google iniciado')
   }
 
   return (

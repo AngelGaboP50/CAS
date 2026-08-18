@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../supabaseClient'
+
 import { useSolicitudes } from '../hooks/useSolicitudes'
 import './DashboardPage.css'
 
@@ -35,52 +35,17 @@ export default function QrAccessPage() {
     }
 
     async function init() {
+      // TODO: Implementar llamada a API para obtener salon
       let currentSalonId = salonId
       if (!currentSalonId || currentSalonId === 'demo') {
-        const { data } = await supabase.from('salones').select('id').limit(1).single()
-        if (data) {
-          currentSalonId = data.id
-          setSalonId(data.id)
-        }
+        currentSalonId = 'demo_id'
+        setSalonId(currentSalonId)
       }
 
       if (currentSalonId && usuario && usuario.id) {
         try {
-          const { data: existing } = await supabase.from('solicitudes_salon')
-            .select('*')
-            .eq('salon_id', currentSalonId)
-            .eq('profesor_id', usuario.id)
-            .in('estado', ['PENDIENTE', 'APROBADA'])
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-
-          if (existing) {
-            setSolicitudActivada(existing)
-            setEstadoSolicitud(existing.estado)
-          } else {
-            const fakeReq = {
-              salon_id: currentSalonId,
-              fecha: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
-              hora_inicio: new Date().toLocaleTimeString('es-MX', { hour12: false, hour: '2-digit', minute:'2-digit' }),
-              hora_fin: new Date(Date.now() + 3600*1000).toLocaleTimeString('es-MX', { hour12: false, hour: '2-digit', minute:'2-digit' }),
-              motivo: 'Apertura inmediata QR'
-            }
-            await crearSolicitud(fakeReq, { id: usuario.id, nombre: usuario.nombre })
-            
-            const { data: created } = await supabase.from('solicitudes_salon')
-              .select('*')
-              .eq('salon_id', currentSalonId)
-              .eq('profesor_id', usuario.id)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .single()
-
-            if (created) {
-              setSolicitudActivada(created)
-              setEstadoSolicitud(created.estado)
-            }
-          }
+          // TODO: Implementar llamada a API para crear/obtener solicitud
+          console.log('Crear/Obtener solicitud para', currentSalonId)
         } catch (e) {
           console.error(e)
         }
@@ -94,19 +59,7 @@ export default function QrAccessPage() {
   // Escuchar si el admin aprueba la solicitud
   useEffect(() => {
     if (!solicitudActivada?.id) return
-
-    const canal = supabase
-      .channel('req_watch_' + solicitudActivada.id)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'solicitudes_salon', filter: `id=eq.${solicitudActivada.id}` },
-        (payload) => {
-          setEstadoSolicitud(payload.new.estado)
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(canal) }
+    // TODO: Implementar websocket/polling para escuchar aprobación
   }, [solicitudActivada?.id])
 
   // Timer de 1 hora o tiempo real cuando esté aprobada
@@ -136,8 +89,7 @@ export default function QrAccessPage() {
 
   const handleCerrarCerradura = async () => {
     if (!solicitudActivada?.id) return
-    await supabase.from('solicitudes_salon').update({ estado: 'CANCELADA' }).eq('id', solicitudActivada.id)
-    await supabase.from('salones').update({ estado: 'LIBRE' }).eq('id', solicitudActivada.salon_id)
+    // TODO: Implementar llamada a API para cancelar solicitud
     setEstadoSolicitud('CANCELADA')
     navigate('/dashboard')
   }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './LoginPage.css'
 
-import { supabase } from '../../../core/config/supabaseClient'
+
 function LoginPage() {
   const navigate = useNavigate()
   const [correo, setCorreo] = useState('')
@@ -13,43 +13,19 @@ function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
     setLoading(true)
-
+    setError('')
     try {
-      // 1. Iniciar sesión usando Supabase Auth (verifica la contraseña)
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: correo,
-        password: password,
-      })
-
-      if (authError) throw authError
-
-      // 2. Traemos la información adicional del usuario (rol, nombre) desde la tabla pública
-      if (authData.user) {
-        const { data: userData, error: dbError } = await supabase
-          .from('usuarios')
-          .select('*')
-          .eq('correo', correo)
-          .single()
-
-        if (dbError) {
-          // Si no encontramos el usuario en nuestra tabla, igual lo dejamos pasar pero con datos por defecto o tiramos error
-          console.warn('Usuario no encontrado en la tabla pública usuarios')
-        }
-
-        sessionStorage.setItem('usuario', JSON.stringify({
-          id: userData?.id || authData.user.id,
-          nombre: userData?.nombre || 'Usuario',
-          correo: authData.user.email,
-          tipo: userData?.tipo || 'indefinido',
-        }))
-        
-        if (userData?.tipo === 'admin') {
-          navigate('/admin')
-        } else {
-          navigate('/dashboard')
-        }
+      // TODO: Implementar login con nuevo backend
+      console.log('Login attempt with', correo)
+      sessionStorage.setItem('usuario', JSON.stringify({
+        id: 1, correo: correo, tipo: correo.includes('admin') ? 'admin' : 'profesor'
+      }))
+      
+      if (correo.includes('admin')) {
+        navigate('/admin')
+      } else {
+        navigate('/dashboard')
       }
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión')

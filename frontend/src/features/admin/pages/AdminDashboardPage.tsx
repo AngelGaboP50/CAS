@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../../core/config/supabaseClient'
+
 import '../../../shared/styles/DashboardPage.css' // Reutilizamos los estilos del dashboard normal
 import { InteractiveMap } from '../../salones/components/InteractiveMap'
 import { useAulas, type EstadoAula } from '../../salones/hooks/useAulas'
@@ -135,7 +135,9 @@ function AdminDashboardPage() {
 
   const fetchUsuarios = async () => {
     setLoadingUsuarios(true)
-    const { data, error } = await supabase.from('usuarios').select('*').order('created_at', { ascending: false })
+    // TODO: Llamada a API
+    const data: any[] = []
+    const error = null
     if (!error && data) {
       setUsuarios(data)
     }
@@ -172,15 +174,12 @@ function AdminDashboardPage() {
     e.preventDefault()
     
     if (editingId) {
-      // Actualizar
-      const { error } = await supabase.from('usuarios')
-        .update({ nombre: formName, correo: formEmail, tipo: formType })
-        .eq('id', editingId)
+      // TODO: API Actualizar
+      const error = null
       if (!error) fetchUsuarios()
     } else {
-      // Crear nuevo en la tabla 'usuarios'
-      const { error } = await supabase.from('usuarios')
-        .insert([{ nombre: formName, correo: formEmail, tipo: formType }])
+      // TODO: API Crear
+      const error = null
       if (!error) fetchUsuarios()
     }
     
@@ -189,7 +188,8 @@ function AdminDashboardPage() {
 
   const deleteUser = async (id: string) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
-      const { error } = await supabase.from('usuarios').delete().eq('id', id)
+      // TODO: API Borrar
+      const error = null
       if (!error) fetchUsuarios()
     }
   }
