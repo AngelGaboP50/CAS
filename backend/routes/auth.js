@@ -183,21 +183,21 @@ router.post('/forgot-password', async (req, res) => {
     )
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const resetLink = \`\${frontendUrl}/reset-password?token=\${resetToken}\`
+    const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`
 
-    const html = \`
+    const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
         <h2 style="color: #2b5c8f; text-align: center;">Recuperación de Contraseña</h2>
-        <p>Hola <strong>\${usuario.nombre}</strong>,</p>
+        <p>Hola <strong>${usuario.nombre}</strong>,</p>
         <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en CAS.</p>
         <p>Para crear una nueva contraseña, haz clic en el siguiente enlace. Este enlace caducará en 1 hora.</p>
         <div style="text-align: center; margin: 30px 0;">
-          <a href="\${resetLink}" style="background-color: #4a90e2; color: white; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold;">Restablecer mi contraseña</a>
+          <a href="${resetLink}" style="background-color: #4a90e2; color: white; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold;">Restablecer mi contraseña</a>
         </div>
         <p>Si no solicitaste esto, puedes ignorar este correo de forma segura. Tu contraseña no cambiará hasta que accedas al enlace y crees una nueva.</p>
-        <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">© \${new Date().getFullYear()} CAS Equipo 6</p>
+        <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">© ${new Date().getFullYear()} CAS Equipo 6</p>
       </div>
-    \`
+    `
 
     await sendEmail(correo, 'Recuperación de Contraseña - CAS', html)
 
