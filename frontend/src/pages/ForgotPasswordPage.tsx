@@ -8,7 +8,7 @@ function ForgotPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
@@ -65,9 +65,11 @@ function ForgotPasswordPage() {
               <span className="material-symbols-outlined" style={{ color: 'var(--color-secondary)', fontSize: '32px' }}>lock_reset</span>
               <h2 className="card-title" style={{ fontSize: '26px', margin: 0 }}>Recuperar contraseña</h2>
             </div>
-            
+
             <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: '1.5' }}>
               Ingresa tu ID Universitario o correo electrónico y te enviaremos las instrucciones para restablecer tu contraseña.
+              <br />
+              El correo podria estar en la bandeja de SPAM en caso de no encotrarse.
             </p>
 
             {/* Form */}

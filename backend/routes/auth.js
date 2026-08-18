@@ -1,8 +1,8 @@
-const express  = require('express')
-const bcrypt   = require('bcryptjs')
-const jwt      = require('jsonwebtoken')
-const crypto   = require('crypto')
-const pool     = require('../db')
+const express = require('express')
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
+const crypto = require('crypto')
+const pool = require('../db')
 const { sendEmail } = require('../utils/mailer')
 
 const router = express.Router()
@@ -39,6 +39,10 @@ router.post('/register', async (req, res) => {
     // Enviar correo con OTP
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <!-- REEMPLAZA EL ENLACE DE ABAJO CON EL ENLACE DIRECTO DE TU LOGO EN HOSTINGER -->
+          <img src="https://devnationqro.com/Logo/CAS.jpeg" alt="CAS Logo" style="max-width: 150px; height: auto;" />
+        </div>
         <h2 style="color: #2b5c8f; text-align: center;">Verifica tu correo electrónico</h2>
         <p>Hola <strong>${nombre}</strong>,</p>
         <p>Gracias por registrarte en CAS (Control de Acceso a Salones). Para completar tu registro y activar tu cuenta, ingresa el siguiente código de verificación:</p>
@@ -144,10 +148,10 @@ router.post('/login', async (req, res) => {
       message: 'Inicio de sesión exitoso',
       token,
       usuario: {
-        id:     usuario.id,
+        id: usuario.id,
         nombre: usuario.nombre,
         correo: usuario.correo,
-        rol:    usuario.rol
+        rol: usuario.rol
       }
     })
   } catch (err) {
@@ -167,7 +171,7 @@ router.post('/forgot-password', async (req, res) => {
 
   try {
     const [rows] = await pool.query('SELECT id, nombre FROM usuarios WHERE correo = ?', [correo])
-    
+
     // Siempre respondemos OK por seguridad para no revelar correos registrados
     if (rows.length === 0) {
       return res.status(200).json({ message: 'Si el correo existe, se enviarán las instrucciones.' })
@@ -187,6 +191,10 @@ router.post('/forgot-password', async (req, res) => {
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <!-- REEMPLAZA EL ENLACE DE ABAJO CON EL ENLACE DIRECTO DE TU LOGO EN HOSTINGER -->
+          <img src="https://devnationqro.com/Logo/CAS.jpeg" alt="CAS Logo" style="max-width: 150px; height: auto;" />
+        </div>
         <h2 style="color: #2b5c8f; text-align: center;">Recuperación de Contraseña</h2>
         <p>Hola <strong>${usuario.nombre}</strong>,</p>
         <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en CAS.</p>
@@ -195,7 +203,7 @@ router.post('/forgot-password', async (req, res) => {
           <a href="${resetLink}" style="background-color: #4a90e2; color: white; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold;">Restablecer mi contraseña</a>
         </div>
         <p>Si no solicitaste esto, puedes ignorar este correo de forma segura. Tu contraseña no cambiará hasta que accedas al enlace y crees una nueva.</p>
-        <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">© ${new Date().getFullYear()} CAS Equipo 6</p>
+        <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">© ${new Date().getFullYear()} CAS Soporte</p>
       </div>
     `
 
