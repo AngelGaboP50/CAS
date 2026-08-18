@@ -6,11 +6,22 @@ function ForgotPasswordPage() {
   const [identifier, setIdentifier] = useState('')
   const [isSubmitted, setIsSubmitted] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: conectar al backend para enviar la solicitud de recuperación
-    console.log('Solicitud de recuperación para:', identifier)
-    setIsSubmitted(true)
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ correo: identifier })
+      })
+      // No matter what the backend returns (for security, it might return success even if email doesn't exist)
+      setIsSubmitted(true)
+    } catch (err) {
+      console.error(err)
+      setIsSubmitted(true) // Still show submitted to not leak info
+    }
   }
 
   return (
