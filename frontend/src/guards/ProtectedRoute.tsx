@@ -1,6 +1,6 @@
 // src/guards/ProtectedRoute.tsx
 // Protege rutas: redirige al login si no hay sesión activa.
-// También valida el rol: si se requiere 'admin' y el usuario es 'profesor', redirige.
+// Roles: 1 = Profesor, 2 = Administrador
 
 import { Navigate } from 'react-router-dom'
 
@@ -12,7 +12,15 @@ interface ProtectedRouteProps {
 function getUsuario() {
   try {
     const raw = sessionStorage.getItem('usuario')
-    return raw ? JSON.parse(raw) : null
+    if (!raw) return null
+    const user = JSON.parse(raw)
+    if (user) {
+      if (user.rol === 1) user.tipo = 'profesor'
+      if (user.rol === 2) user.tipo = 'admin'
+      if (user.tipo === 'profesor') user.rol = 1
+      if (user.tipo === 'admin') user.rol = 2
+    }
+    return user
   } catch {
     return null
   }
@@ -27,14 +35,22 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     return <Navigate to="/login" replace />
   }
 
+  const esAdmin    = usuario.rol === 2
+  const esProfesor = usuario.rol === 1
+
   // Requiere admin y no lo es → dashboard del profesor
-  if (requiredRole === 'admin' && usuario.tipo !== 'admin') {
+  if (requiredRole === 'admin' && !esAdmin) {
     return <Navigate to="/dashboard" replace />
   }
 
   // Requiere profesor y es admin → panel admin
-  if (requiredRole === 'profesor' && usuario.tipo === 'admin') {
+  if (requiredRole === 'profesor' && esAdmin) {
     return <Navigate to="/admin" replace />
+  }
+
+  // Si no coincide con ningún rol y la ruta requiere uno → login
+  if (requiredRole && !esAdmin && !esProfesor) {
+    return <Navigate to="/login" replace />
   }
 
   return <>{children}</>

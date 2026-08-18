@@ -2,8 +2,7 @@
 // Pestaña completa para gestionar salones desde el panel admin:
 // crear, editar nombre/capacidad/piso, cambiar estado, eliminar
 
-import { useState } from 'react'
-import { supabase } from '../supabaseClient'
+import { useState, useEffect } from 'react'
 import { useAulas, type EstadoAula } from '../hooks/useAulas'
 
 const ESTADOS: EstadoAula[] = ['LIBRE', 'EN_CLASE', 'ALERTA', 'EXCEPCION', 'NO_DISPONIBLE']
@@ -36,6 +35,10 @@ const FORM_VACIO: FormSalon = { nombre: '', capacidad: '30', piso: '1', estado: 
 export default function SalonesAdminTab() {
   const { aulas, loading, fetchAulas } = useAulas()
 
+  useEffect(() => {
+    fetchAulas()
+  }, [fetchAulas])
+
   const [modalOpen, setModalOpen]   = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [form, setForm]             = useState<FormSalon>(FORM_VACIO)
@@ -61,9 +64,9 @@ export default function SalonesAdminTab() {
   const abrirEditar = (aula: typeof aulas[0]) => {
     setEditandoId(aula.id)
     setForm({
-      nombre:    aula.label.startsWith('Salón') ? aula.label : `Salón ${aula.label}`,
-      capacidad: '30',
-      piso:      '1',
+      nombre:    aula.label,
+      capacidad: String(aula.capacidad ?? 30),
+      piso:      String(aula.piso ?? 1),
       estado:    aula.estado,
     })
     setErrorMsg('')
@@ -83,32 +86,40 @@ export default function SalonesAdminTab() {
     setGuardando(true)
     setErrorMsg('')
 
+    const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = sessionStorage.getItem('token')
+
     try {
+      const body = {
+        nombre: form.nombre.trim(),
+        estado: form.estado,
+        activo: form.estado !== 'NO_DISPONIBLE' ? 1 : 0,
+        capacidad: parseInt(form.capacidad) || 30,
+        piso: parseInt(form.piso) || 1
+      }
+
       if (editandoId) {
         // Actualizar salón existente
-        const { error } = await supabase
-          .from('salones')
-          .update({
-            nombre:    form.nombre.trim(),
-            estado:    form.estado,
-            activo:    form.estado !== 'NO_DISPONIBLE',
-            capacidad: parseInt(form.capacidad) || 30,
-            piso:      parseInt(form.piso) || 1,
-          })
-          .eq('id', editandoId)
-        if (error) throw error
+        const res = await fetch(`${API}/api/salones/${editandoId}`, {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(body)
+        })
+        if (!res.ok) throw new Error('Error al actualizar el salón')
       } else {
         // Crear nuevo salón
-        const { error } = await supabase
-          .from('salones')
-          .insert([{
-            nombre:    form.nombre.trim(),
-            estado:    form.estado,
-            activo:    form.estado !== 'NO_DISPONIBLE',
-            capacidad: parseInt(form.capacidad) || 30,
-            piso:      parseInt(form.piso) || 1,
-          }])
-        if (error) throw error
+        const res = await fetch(`${API}/api/salones`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(body)
+        })
+        if (!res.ok) throw new Error('Error al crear el salón')
       }
 
       await fetchAulas()
@@ -123,9 +134,15 @@ export default function SalonesAdminTab() {
 
   const eliminar = async (id: string) => {
     setEliminando(id)
+    const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = sessionStorage.getItem('token')
+
     try {
-      const { error } = await supabase.from('salones').delete().eq('id', id)
-      if (error) throw error
+      const res = await fetch(`${API}/api/salones/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Error al eliminar el salón')
       await fetchAulas()
       setConfirmEliminar(null)
     } catch (err: any) {
@@ -137,11 +154,33 @@ export default function SalonesAdminTab() {
 
   const cambiarEstadoRapido = async (id: string, estadoActual: EstadoAula) => {
     const siguiente = ESTADOS[(ESTADOS.indexOf(estadoActual) + 1) % ESTADOS.length]
-    const { error } = await supabase
-      .from('salones')
-      .update({ estado: siguiente, activo: siguiente !== 'NO_DISPONIBLE' })
-      .eq('id', id)
-    if (!error) await fetchAulas()
+    const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = sessionStorage.getItem('token')
+    
+    const aulaActual = aulas.find(a => String(a.id) === String(id))
+    const nombre = aulaActual ? aulaActual.label : `Salón ${id}`
+    const capacidad = aulaActual?.capacidad || 30
+    const piso = aulaActual?.piso || 1
+
+    try {
+      await fetch(`${API}/api/salones/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          nombre,
+          estado: siguiente,
+          activo: siguiente !== 'NO_DISPONIBLE' ? 1 : 0,
+          capacidad,
+          piso
+        })
+      })
+      await fetchAulas()
+    } catch (err) {
+      console.error('Error al cambiar de estado rápido:', err)
+    }
   }
 
   return (
@@ -204,7 +243,7 @@ export default function SalonesAdminTab() {
                   onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
 
                   <td style={{ padding: '14px 16px', fontWeight: 500 }}>
-                    {aula.label.startsWith('Salón') ? aula.label : `Salón ${aula.label}`}
+                    {aula.label}
                   </td>
 
                   <td style={{ padding: '14px 16px' }}>
@@ -227,11 +266,11 @@ export default function SalonesAdminTab() {
                   </td>
 
                   <td style={{ padding: '14px 16px', fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>
-                    — personas
+                    {aula.capacidad ?? 30} alumnos
                   </td>
 
                   <td style={{ padding: '14px 16px', fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>
-                    Piso —
+                    Piso {aula.piso ?? 1}
                   </td>
 
                   <td style={{ padding: '14px 16px' }}>

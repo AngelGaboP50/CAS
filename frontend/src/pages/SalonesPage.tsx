@@ -1,5 +1,6 @@
 // src/pages/SalonesPage.tsx
-// Vista del PROFESOR: consulta de disponibilidad de salones en tiempo real
+// Vista del PROFESOR: consulta de disponibilidad de salones en tiempo real.
+// El layout (sidebar, topbar) lo provee AppShell.
 
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -90,24 +91,9 @@ export default function SalonesPage() {
   }
 
   return (
-    <div className="dash-root">
-      <div className="dash-glow dash-glow-1" />
-      <div className="dash-glow dash-glow-2" />
-
-      <header className="dash-header">
-        <div className="dash-brand">
-          <div className="dash-brand-bar" />
-          <h1 className="dash-brand-title" style={{ fontSize: '18px' }}>Control de Acceso</h1>
-        </div>
-        <div className="dash-header-actions">
-          <button className="dash-logout-btn" onClick={() => navigate('/dashboard')}>
-            <span className="material-symbols-outlined">arrow_back</span> Volver
-          </button>
-        </div>
-      </header>
-
-      <main className="dash-main">
-        <div className="dash-welcome">
+    <>
+      {/* Encabezado de sección */}
+      <div className="dash-welcome" style={{ marginBottom: '28px' }}>
           <div className="dash-welcome-icon">
             <span className="material-symbols-outlined">meeting_room</span>
           </div>
@@ -168,7 +154,7 @@ export default function SalonesPage() {
                   </span>
                 </div>
 
-                <h3 className="dash-card-title">{aula.label.startsWith('Salón') ? aula.label : `Salón ${aula.label}`}</h3>
+                <h3 className="dash-card-title">{aula.label}</h3>
                 <p className="dash-card-desc" style={{ marginBottom: '20px' }}>
                   Estado actualizado en tiempo real. {aula.estado === 'LIBRE' ? 'Puedes solicitar este espacio.' : 'Este salón no está disponible en este momento.'}
                 </p>
@@ -196,11 +182,6 @@ export default function SalonesPage() {
             )}
           </div>
         )}
-      </main>
-
-      <footer className="dash-footer">
-        <p>© 2026 IDGS15 Equipo 6. TODOS LOS DERECHOS RESERVADOS.</p>
-      </footer>
 
       {/* Modal Solicitud */}
       {modalSolicitud && (
@@ -227,7 +208,7 @@ export default function SalonesPage() {
                 <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>Fecha</label>
                   <input type="date" required style={inputStyle}
-                    min={new Date().toISOString().split('T')[0]}
+                    min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
                     value={form.fecha}
                     onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} />
                 </div>
@@ -267,6 +248,6 @@ export default function SalonesPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

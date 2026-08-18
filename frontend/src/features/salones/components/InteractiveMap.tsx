@@ -100,7 +100,7 @@ export const InteractiveMap: React.FC = () => {
   return (
     <div className="map-container" style={{ margin: '0 0 40px 0', background: 'transparent', border: 'none', padding: 0 }}>
       <div className="map-header" style={{ marginBottom: '20px' }}>
-        <h3 className="map-title" style={{ fontSize: '22px', fontWeight: 600 }}>Mapa del edificio</h3>
+        <h3 className="map-title" style={{ fontSize: '22px', fontWeight: 600 }}>Mapa del edificio (Planta Alta)</h3>
       </div>
 
       <div className="svg-map-wrapper">

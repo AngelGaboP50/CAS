@@ -891,3 +891,359 @@
 .map-card--span2 {
   grid-column: span 2;
 }
+
+/* ─── Horario Status Badges ──────────────────────────────────── */
+.hor-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.hor-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 20px;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+
+.hor-status-badge--pending {
+  background: rgba(251, 211, 141, .15);
+  color: #fbd38d;
+  border: 1px solid rgba(251, 211, 141, .35);
+}
+
+.hor-status-badge--authorized {
+  background: rgba(74, 225, 131, .15);
+  color: #4ae183;
+  border: 1px solid rgba(74, 225, 131, .35);
+}
+
+.hor-status-badge--rejected {
+  background: rgba(255, 107, 122, .12);
+  color: #ff6b7a;
+  border: 1px solid rgba(255, 107, 122, .35);
+}
+
+.hor-status-badge .material-symbols-outlined {
+  font-size: 15px;
+}
+
+/* Pulse animation for pending badge */
+@keyframes pendingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.hor-status-badge--pending {
+  animation: pendingPulse 2s ease-in-out infinite;
+}
+
+/* ─── Pending Notice Banner ──────────────────────────────────── */
+.hor-pending-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(251, 211, 141, .07);
+  border: 1px solid rgba(251, 211, 141, .25);
+  color: #fbd38d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hor-pending-notice .material-symbols-outlined {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hor-rejected-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(255, 107, 122, .07);
+  border: 1px solid rgba(255, 107, 122, .25);
+  color: #ff6b7a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hor-rejected-notice .material-symbols-outlined {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ─── Card Tag Variants ───────────────────────────────────────── */
+.dash-card-tag--pending {
+  background: rgba(251, 211, 141, .12);
+  color: #fbd38d;
+  border-color: rgba(251, 211, 141, .3);
+  animation: pendingPulse 2s ease-in-out infinite;
+}
+
+.dash-card-tag--rejected {
+  background: rgba(255, 107, 122, .12);
+  color: #ff6b7a;
+  border-color: rgba(255, 107, 122, .3);
+}
+
+/* ─── Admin Horarios Panel ───────────────────────────────────── */
+.admin-horarios-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-horario-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 24px;
+  border-radius: 14px;
+  background: var(--color-surface-container-high);
+  border: 1px solid var(--color-outline-variant);
+  transition: border-color .2s;
+}
+
+.admin-horario-card:hover {
+  border-color: rgba(146, 204, 255, .3);
+}
+
+.admin-horario-thumb {
+  width: 80px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--color-outline-variant);
+  background: rgba(0,0,0,.3);
+  cursor: pointer;
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+
+.admin-horario-thumb:hover {
+  transform: scale(1.05);
+}
+
+.admin-horario-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-horario-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  margin: 0 0 4px;
+}
+
+.admin-horario-meta {
+  font-size: 12px;
+  color: var(--color-on-surface-variant);
+  margin: 0;
+}
+
+.admin-horario-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.admin-btn-authorize {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: 1px solid rgba(74, 225, 131, .4);
+  background: rgba(74, 225, 131, .1);
+  color: #4ae183;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.admin-btn-authorize:hover {
+  background: rgba(74, 225, 131, .2);
+  border-color: #4ae183;
+}
+
+.admin-btn-authorize .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.admin-btn-reject {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 107, 122, .4);
+  background: rgba(255, 107, 122, .08);
+  color: #ff6b7a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.admin-btn-reject:hover {
+  background: rgba(255, 107, 122, .18);
+  border-color: #ff6b7a;
+}
+
+.admin-btn-reject .material-symbols-outlined {
+  font-size: 17px;
+}
+
+/* Preview Modal overlay (admin view image) */
+.admin-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: fadeIn .18s ease;
+}
+
+.admin-preview-img {
+  max-width: 90vw;
+  max-height: 85vh;
+  border-radius: 14px;
+  border: 1px solid var(--color-outline-variant);
+  object-fit: contain;
+  box-shadow: 0 30px 80px rgba(0,0,0,.6);
+}
+
+.admin-preview-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(30,31,38,.9);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 10px;
+  color: var(--color-on-surface-variant);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  transition: all .2s;
+}
+
+.admin-preview-close:hover {
+  border-color: #ff6b7a;
+  color: #ff6b7a;
+}
+
+/* Empty state for horarios */
+.admin-horarios-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--color-on-surface-variant);
+  text-align: center;
+}
+
+.admin-horarios-empty .material-symbols-outlined {
+  font-size: 52px;
+  opacity: .4;
+}
+
+.admin-horarios-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Tabs within admin horarios */
+.admin-hor-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.admin-hor-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--color-outline-variant);
+  background: transparent;
+  color: var(--color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.admin-hor-tab:hover {
+  border-color: rgba(146, 204, 255, .4);
+  color: var(--color-primary);
+}
+
+.admin-hor-tab--active {
+  background: rgba(146, 204, 255, .1);
+  border-color: rgba(146, 204, 255, .35);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.admin-hor-tab .material-symbols-outlined {
+  font-size: 17px;
+}
+
+/* Count badge on tab */
+.admin-hor-tab-count {
+  background: rgba(251, 211, 141, .2);
+  color: #fbd38d;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+}
+
+/* Authorized/Rejected status indicators in admin list */
+.admin-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+.admin-status-chip--pending {
+  background: rgba(251, 211, 141, .12);
+  color: #fbd38d;
+  border: 1px solid rgba(251, 211, 141, .3);
+}
+.admin-status-chip--authorized {
+  background: rgba(74, 225, 131, .12);
+  color: #4ae183;
+  border: 1px solid rgba(74, 225, 131, .3);
+}
+.admin-status-chip--rejected {
+  background: rgba(255, 107, 122, .1);
+  color: #ff6b7a;
+  border: 1px solid rgba(255, 107, 122, .3);
+}

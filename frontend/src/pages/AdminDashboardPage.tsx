@@ -10,7 +10,6 @@ import { useAulas, type EstadoAula } from '../hooks/useAulas'
 import { useNotificaciones } from '../hooks/useNotificaciones'
 import { useSolicitudes } from '../hooks/useSolicitudes'
 import { useAccesos } from '../hooks/useAccesos'
-import { useHorarios, type DiaSemana } from '../hooks/useHorarios'
 import SalonesAdminTab from '../components/SalonesAdminTab'
 
 type Tab = 'principal' | 'usuarios' | 'salones' | 'solicitudes' | 'historial' | 'horarios' | 'perfil'
@@ -20,7 +19,20 @@ const ADMIN_GLOW = 'rgba(255, 77, 79, 0.4)'
 const ADMIN_BG = 'rgba(255, 77, 79, 0.15)'
 
 function getUsuario() {
-  try { return JSON.parse(sessionStorage.getItem('usuario') ?? '') } catch { return null }
+  try {
+    const raw = sessionStorage.getItem('usuario')
+    if (!raw) return null
+    const user = JSON.parse(raw)
+    if (user) {
+      if (user.rol === 1) user.tipo = 'profesor'
+      if (user.rol === 2) user.tipo = 'admin'
+      if (user.tipo === 'profesor') user.rol = 1
+      if (user.tipo === 'admin') user.rol = 2
+    }
+    return user
+  } catch {
+    return null
+  }
 }
 
 function formatFecha(iso: string) {
@@ -68,108 +80,68 @@ export default function AdminDashboardPage() {
   // ── Historial ──
   const { accesos, loading: loadingAccesos, registrarAcceso } = useAccesos()
 
-  // ── Horarios ──
-  const { horarios, loading: loadingHorarios, crearHorario, eliminarHorario } = useHorarios()
-  const [modalHorario, setModalHorario] = useState(false)
-  const [hForm, setHForm] = useState({ profesor_id: '', salon_id: '', dia_semana: 'LUNES' as DiaSemana, hora_inicio: '', hora_fin: '', materia: '' })
-  const [creandoH, setCreandoH] = useState(false)
-  const [errorH, setErrorH] = useState('')
-
-  // ── Imagen de horario por profesor (admin sube/elimina) ──
-  const BUCKET = 'files'
-  const HORARIOS_FOLDER = 'imagenes'
-  const [modalImagenHorario, setModalImagenHorario] = useState(false)
-  const [profesorSeleccionado, setProfesorSeleccionado] = useState<any>(null)
-  const [imagenHorarioUrl, setImagenHorarioUrl] = useState<string | null>(null)
-  const [loadingImagen, setLoadingImagen] = useState(false)
-  const [uploadingImagen, setUploadingImagen] = useState(false)
-  const [deletingImagen, setDeletingImagen] = useState(false)
-  const [errorImagen, setErrorImagen] = useState<string | null>(null)
-  const [deleteConfirmImagen, setDeleteConfirmImagen] = useState(false)
-  const fileInputAdminRef = useRef<HTMLInputElement>(null)
-
-  const fetchImagenHorario = async (profesorId: number) => {
-    setLoadingImagen(true)
-    setErrorImagen(null)
-    try {
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .list(`${HORARIOS_FOLDER}/${profesorId}`, { limit: 5 })
-      if (error) throw error
-      const archivo = data?.find((f: any) => f.name.startsWith('horario.'))
-      if (archivo) {
-        const { data: urlData } = supabase.storage
-          .from(BUCKET)
-          .getPublicUrl(`${HORARIOS_FOLDER}/${profesorId}/${archivo.name}`)
-        setImagenHorarioUrl(`${urlData.publicUrl}?t=${Date.now()}`)
-      } else {
-        setImagenHorarioUrl(null)
-      }
-    } catch {
-      setErrorImagen('No se pudo cargar la imagen del horario.')
-    } finally {
-      setLoadingImagen(false)
-    }
-  }
-
-  const abrirModalImagenHorario = (prof: any) => {
-    setProfesorSeleccionado(prof)
-    setImagenHorarioUrl(null)
-    setErrorImagen(null)
-    setDeleteConfirmImagen(false)
-    setModalImagenHorario(true)
-    fetchImagenHorario(prof.id)
-  }
-
-  const handleSubirImagenHorario = async (file: File) => {
-    if (!profesorSeleccionado) return
-    if (!file.type.startsWith('image/')) { setErrorImagen('Solo se permiten imágenes PNG o JPG.'); return }
-    if (file.size > 10 * 1024 * 1024) { setErrorImagen('El archivo no puede superar los 10 MB.'); return }
-    setErrorImagen(null); setUploadingImagen(true)
-    try {
-      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-      const path = `${HORARIOS_FOLDER}/${profesorSeleccionado.id}/horario.${ext}`
-      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type })
-      if (error) throw error
-      await fetchImagenHorario(profesorSeleccionado.id)
-    } catch {
-      setErrorImagen('Error al subir la imagen. Verifica los permisos del bucket.')
-    } finally {
-      setUploadingImagen(false)
-      if (fileInputAdminRef.current) fileInputAdminRef.current.value = ''
-    }
-  }
-
-  const handleEliminarImagenHorario = async () => {
-    if (!profesorSeleccionado) return
-    setDeletingImagen(true); setErrorImagen(null)
-    try {
-      const { data, error: listErr } = await supabase.storage.from(BUCKET).list(`${HORARIOS_FOLDER}/${profesorSeleccionado.id}`)
-      if (listErr) throw listErr
-      const paths = (data ?? []).map((f: any) => `${HORARIOS_FOLDER}/${profesorSeleccionado.id}/${f.name}`)
-      if (paths.length > 0) {
-        const { error: removeErr } = await supabase.storage.from(BUCKET).remove(paths)
-        if (removeErr) throw removeErr
-      }
-      setImagenHorarioUrl(null); setDeleteConfirmImagen(false)
-    } catch {
-      setErrorImagen('Error al eliminar la imagen. Intenta de nuevo.')
-    } finally {
-      setDeletingImagen(false)
-    }
-  }
+  // ── Horarios de profesores ──
+  type EstadoHorario = 'pendiente' | 'autorizado' | 'rechazado'
+  const [horarioFilter, setHorarioFilter] = useState<EstadoHorario | 'todos'>('pendiente')
+  const [previewImgUrl, setPreviewImgUrl] = useState<string | null>(null)
+  const [horariosData, setHorariosData] = useState<Array<{
+    id: string; profesorNombre: string; profesorCorreo: string
+    imagenUrl: string; estado: EstadoHorario; fecha: string
+  }>>([
+    { id: '1', profesorNombre: 'Ana López', profesorCorreo: 'ana.lopez@uteq.edu.mx',
+      imagenUrl: 'https://placehold.co/400x300/1e1f26/92ccff?text=Horario+Ana',
+      estado: 'pendiente', fecha: new Date(Date.now() - 1000*60*30).toISOString() },
+    { id: '2', profesorNombre: 'Carlos Mendoza', profesorCorreo: 'c.mendoza@uteq.edu.mx',
+      imagenUrl: 'https://placehold.co/400x300/1e1f26/92ccff?text=Horario+Carlos',
+      estado: 'pendiente', fecha: new Date(Date.now() - 1000*60*60*2).toISOString() },
+    { id: '3', profesorNombre: 'Marta Ramírez', profesorCorreo: 'm.ramirez@uteq.edu.mx',
+      imagenUrl: 'https://placehold.co/400x300/1e1f26/4ae183?text=Horario+Marta',
+      estado: 'autorizado', fecha: new Date(Date.now() - 1000*60*60*24).toISOString() },
+  ])
+  const handleAutorizarHorario = (id: string) =>
+    setHorariosData(prev => prev.map(h => h.id === id ? { ...h, estado: 'autorizado' as EstadoHorario } : h))
+  const handleRechazarHorario = (id: string) =>
+    setHorariosData(prev => prev.map(h => h.id === id ? { ...h, estado: 'rechazado' as EstadoHorario } : h))
+  const horariosFiltrados = horariosData.filter(h => horarioFilter === 'todos' ? true : h.estado === horarioFilter)
+  const horariosPendientesCount = horariosData.filter(h => h.estado === 'pendiente').length
 
   useEffect(() => {
     if (!usuario) { navigate('/login', { replace: true }); return }
-    if (usuario.tipo !== 'admin') { navigate('/dashboard', { replace: true }); return }
+    // rol 2 = Administrador
+    if (usuario.rol !== 2) { navigate('/dashboard', { replace: true }); return }
     fetchUsuarios()
   }, [usuario, navigate])
 
   const fetchUsuarios = async () => {
     setLoadingUsuarios(true)
-    const { data, error } = await supabase.from('usuarios').select('*').order('created_at', { ascending: false })
-    if (!error && data) setUsuarios(data)
-    setLoadingUsuarios(false)
+    try {
+      const token = sessionStorage.getItem('token')
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/usuarios`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setUsuarios(data)
+      } else {
+        throw new Error('Fallback to mock')
+      }
+    } catch {
+      const localUsersRaw = sessionStorage.getItem('mock_usuarios')
+      if (localUsersRaw) {
+        setUsuarios(JSON.parse(localUsersRaw))
+      } else {
+        const mockUsers = [
+          { id: '1', nombre: 'Administrador Local', correo: 'admin@uteq.edu.mx', rol: 2, tipo: 'admin', activo: 1, creado_en: new Date().toISOString() },
+          { id: '101', nombre: 'Dr. Héctor Gómez', correo: 'hector.gomez@uteq.edu.mx', rol: 1, tipo: 'profesor', activo: 1, creado_en: new Date().toISOString() },
+          { id: '102', nombre: 'Ing. Laura Martínez', correo: 'laura.martinez@uteq.edu.mx', rol: 1, tipo: 'profesor', activo: 1, creado_en: new Date().toISOString() },
+          { id: '103', nombre: 'M.C. Carlos Pérez', correo: 'carlos.perez@uteq.edu.mx', rol: 1, tipo: 'profesor', activo: 1, creado_en: new Date().toISOString() }
+        ]
+        sessionStorage.setItem('mock_usuarios', JSON.stringify(mockUsers))
+        setUsuarios(mockUsers)
+      }
+    } finally {
+      setLoadingUsuarios(false)
+    }
   }
 
   const handleLogout = () => { sessionStorage.removeItem('usuario'); navigate('/login', { replace: true }) }
@@ -181,34 +153,109 @@ export default function AdminDashboardPage() {
   }
 
   const openAddForm = () => { setIsEditing(true); setEditingId(null); setFormName(''); setFormEmail(''); setFormType('profesor'); setFormPassword('') }
-  const openEditForm = (u: any) => { setIsEditing(true); setEditingId(u.id); setFormName(u.nombre); setFormEmail(u.correo); setFormType(u.tipo ?? 'profesor'); setFormPassword('') }
+  const openEditForm = (u: any) => { 
+    setIsEditing(true); 
+    setEditingId(u.id); 
+    setFormName(u.nombre); 
+    setFormEmail(u.correo); 
+    // Mapear rol numérico a texto si es necesario
+    const tipo = u.rol === 2 || u.tipo === 'admin' ? 'admin' : 'profesor';
+    setFormType(tipo); 
+    setFormPassword('') 
+  }
   const cancelEdit = () => { setIsEditing(false); setEditingId(null) }
 
   const saveUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (editingId) {
-      await supabase.from('usuarios').update({ nombre: formName, correo: formEmail, tipo: formType }).eq('id', editingId)
-    } else {
-      // Crear en Supabase Auth + tabla usuarios
-      if (!formPassword) { alert('Debes ingresar una contraseña para el nuevo usuario'); return }
-      const { error: authErr } = await supabase.auth.admin
-        ? await (supabase.auth as any).admin.createUser({ email: formEmail, password: formPassword, email_confirm: true })
-        : { error: new Error('No tienes permisos de admin de Auth') }
-
-      if (authErr) {
-        // Fallback: insertar solo en tabla pública (el usuario deberá usar "olvidé contraseña")
-        await supabase.from('usuarios').insert([{ nombre: formName, correo: formEmail, tipo: formType }])
+    const token = sessionStorage.getItem('token')
+    const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const rolNum = formType === 'admin' ? 2 : 1
+    try {
+      if (editingId) {
+        const res = await fetch(`${API}/api/usuarios/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ nombre: formName, correo: formEmail, rol: rolNum, activo: 1 })
+        })
+        if (!res.ok) throw new Error()
       } else {
-        await supabase.from('usuarios').insert([{ nombre: formName, correo: formEmail, tipo: formType }])
+        if (!formPassword) { alert('Debes ingresar una contraseña para el nuevo usuario'); return }
+        const res = await fetch(`${API}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ nombre: formName, correo: formEmail, password: formPassword, rol: rolNum })
+        })
+        if (!res.ok) throw new Error()
       }
+    } catch { 
+      // Fallback a almacenamiento mock local
+      const localUsersRaw = sessionStorage.getItem('mock_usuarios')
+      let currentMockUsers = localUsersRaw ? JSON.parse(localUsersRaw) : []
+      if (editingId) {
+        currentMockUsers = currentMockUsers.map((u: any) => u.id === editingId ? { ...u, nombre: formName, correo: formEmail, rol: rolNum, tipo: formType } : u)
+      } else {
+        const nuevo = {
+          id: `usr-${Date.now()}`,
+          nombre: formName,
+          correo: formEmail,
+          rol: rolNum,
+          tipo: formType,
+          activo: 1,
+          creado_en: new Date().toISOString()
+        }
+        currentMockUsers.push(nuevo)
+      }
+      sessionStorage.setItem('mock_usuarios', JSON.stringify(currentMockUsers))
     }
     setIsEditing(false)
     fetchUsuarios()
   }
 
   const deleteUser = async (id: string) => {
-    if (window.confirm('¿Eliminar este usuario?')) {
-      await supabase.from('usuarios').delete().eq('id', id)
+    if (window.confirm('¿Estás seguro de que deseas desactivar este usuario?')) {
+      const token = sessionStorage.getItem('token')
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      try {
+        const res = await fetch(`${API}/api/usuarios/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) throw new Error()
+      } catch {
+        // Fallback mock local
+        const localUsersRaw = sessionStorage.getItem('mock_usuarios')
+        if (localUsersRaw) {
+          const currentMockUsers = JSON.parse(localUsersRaw)
+          const updated = currentMockUsers.map((u: any) => u.id === id ? { ...u, activo: 0 } : u)
+          sessionStorage.setItem('mock_usuarios', JSON.stringify(updated))
+        }
+      }
+      fetchUsuarios()
+    }
+  }
+
+  // Reactivar usuario (solo mock local, ya que la API PUT soporta editar activo)
+  const reactivarUser = async (usuarioObj: any) => {
+    if (window.confirm('¿Estás seguro de que deseas reactivar este usuario?')) {
+      const token = sessionStorage.getItem('token')
+      const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const rolNum = usuarioObj.rol === 2 || usuarioObj.tipo === 'admin' ? 2 : 1
+      try {
+        const res = await fetch(`${API}/api/usuarios/${usuarioObj.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ nombre: usuarioObj.nombre, correo: usuarioObj.correo, rol: rolNum, activo: 1 })
+        })
+        if (!res.ok) throw new Error()
+      } catch {
+        // Fallback mock
+        const localUsersRaw = sessionStorage.getItem('mock_usuarios')
+        if (localUsersRaw) {
+          const currentMockUsers = JSON.parse(localUsersRaw)
+          const updated = currentMockUsers.map((u: any) => u.id === usuarioObj.id ? { ...u, activo: 1 } : u)
+          sessionStorage.setItem('mock_usuarios', JSON.stringify(updated))
+        }
+      }
       fetchUsuarios()
     }
   }
@@ -243,17 +290,6 @@ export default function AdminDashboardPage() {
     } finally { setProcesandoSol(false) }
   }
 
-  const guardarHorario = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrorH(''); setCreandoH(true)
-    try {
-      await crearHorario({ ...hForm, profesor_id: parseInt(hForm.profesor_id) })
-      setModalHorario(false)
-      setHForm({ profesor_id: '', salon_id: '', dia_semana: 'LUNES', hora_inicio: '', hora_fin: '', materia: '' })
-    } catch (err: any) {
-      setErrorH(err.message ?? 'Error al crear horario')
-    } finally { setCreandoH(false) }
-  }
 
   const inputStyle: React.CSSProperties = {
     padding: '10px 14px', borderRadius: '8px', background: 'var(--color-bg)',
@@ -316,10 +352,11 @@ export default function AdminDashboardPage() {
           </button>
 
           {([
+            { id: 'principal', icon: 'home', label: 'Inicio' },
             { id: 'salones', icon: 'meeting_room', label: 'Salones' },
             { id: 'usuarios', icon: 'group', label: 'Usuarios' },
-            { id: 'horarios', icon: 'schedule', label: 'Horarios' },
             { id: 'solicitudes', icon: 'pending_actions', label: `Solicitudes${pendientes > 0 ? ` (${pendientes})` : ''}` },
+            { id: 'horarios', icon: 'calendar_month', label: `Horarios${horariosPendientesCount > 0 ? ` (${horariosPendientesCount})` : ''}` },
             { id: 'historial', icon: 'history', label: 'Historial' },
             { id: 'perfil', icon: 'person', label: 'Perfil' },
           ] as const).map(item => (
@@ -330,6 +367,18 @@ export default function AdminDashboardPage() {
               {isSidebarOpen && <span>{item.label}</span>}
             </button>
           ))}
+
+          {/* Acceso directo: Demo Simulación */}
+          <button
+            style={sidebarItemStyle(false)}
+            onClick={() => navigate('/simulacion')}
+            title="Demo Simulación"
+            onMouseOver={e => { e.currentTarget.style.color = '#a78bfa'; e.currentTarget.style.background = 'rgba(167,139,250,.1)' }}
+            onMouseOut={e => { e.currentTarget.style.color = 'var(--color-on-surface-variant)'; e.currentTarget.style.background = 'transparent' }}
+          >
+            <span className="material-symbols-outlined">sensors</span>
+            {isSidebarOpen && <span>Demo Simulación</span>}
+          </button>
 
           <div style={{ flex: 1 }} />
 
@@ -362,54 +411,88 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <InteractiveMap />
-
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', gap: '8px' }}>
-                  <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)' }}>door_open</span>
-                  <h3 style={{ fontSize: '20px', margin: 0, fontWeight: 600 }}>Control de Salones</h3>
-                </div>
-
-                <div className="dash-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
-                  {aulas.length === 0 ? (
-                    <p style={{ color: 'var(--color-on-surface-variant)', gridColumn: '1 / -1' }}>No hay salones registrados.</p>
-                  ) : aulas.map(aula => (
-                    <div className="dash-card" key={aula.id}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <span className="material-symbols-outlined dash-card-icon" style={{
-                          fontSize: '50px',
-                          color: aula.estado === 'LIBRE' ? 'var(--color-secondary)' : aula.estado === 'EN_CLASE' ? 'var(--color-primary)' : aula.estado === 'NO_DISPONIBLE' ? 'var(--color-on-surface-variant)' : '#ff6b7a'
-                        }}>
-                          meeting_room
-                        </span>
-                        <span className="dash-badge" style={{
-                          background: aula.estado === 'LIBRE' ? 'rgba(74,225,131,.15)' : aula.estado === 'EN_CLASE' ? 'rgba(146,204,255,.1)' : aula.estado === 'NO_DISPONIBLE' ? 'rgba(255,255,255,.05)' : 'rgba(255,107,122,.1)',
-                          color: aula.estado === 'LIBRE' ? 'var(--color-secondary)' : aula.estado === 'EN_CLASE' ? 'var(--color-primary)' : aula.estado === 'NO_DISPONIBLE' ? 'var(--color-on-surface-variant)' : '#ff6b7a',
-                          border: 'none', margin: 0
-                        }}>
-                          {aula.estado.replace('_', ' ')}
-                        </span>
-                      </div>
-                      <h3 className="dash-card-title" style={{ fontSize: '22px' }}>{aula.label.startsWith('Salón') ? aula.label : `Salón ${aula.label}`}</h3>
-                      <p className="dash-card-desc">Controla este espacio y revisa actividad reciente.</p>
-                      <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-                        <button className="dash-logout-btn" style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-outline-variant)' }}
-                          onClick={() => handleUpdateEstado(aula.id, aula.estado)}>
-                          <span className="material-symbols-outlined">swap_horiz</span> Cambiar
-                        </button>
-                        <button className="dash-logout-btn" style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-outline-variant)' }}
-                          onClick={() => setActiveTab('historial')}>
-                          <span className="material-symbols-outlined">history</span> Historial
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </>
             )}
 
-            {/* ── USUARIOS ── */}
+            {/* ── HORARIOS ── */}
+            {activeTab === 'horarios' && (
+              <div className="dash-card" style={{ padding: '30px', margin: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                  <h3 className="dash-card-title" style={{ fontSize: '24px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '28px' }}>calendar_month</span>
+                    Horarios de Profesores
+                  </h3>
+                  <span style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
+                    {horariosPendientesCount} pendiente{horariosPendientesCount !== 1 ? 's' : ''} de autorización
+                  </span>
+                </div>
+
+                {/* Filtros */}
+                <div className="admin-hor-tabs">
+                  {([['pendiente','pending','Pendientes'], ['autorizado','check_circle','Autorizados'], ['rechazado','cancel','Rechazados'], ['todos','list','Todos']] as const).map(([val, icon, label]) => (
+                    <button key={val} className={`admin-hor-tab${horarioFilter === val ? ' admin-hor-tab--active' : ''}`} onClick={() => setHorarioFilter(val as any)}>
+                      <span className="material-symbols-outlined">{icon}</span>
+                      {label}
+                      {val === 'pendiente' && horariosPendientesCount > 0 && <span className="admin-hor-tab-count">{horariosPendientesCount}</span>}
+                    </button>
+                  ))}
+                </div>
+
+                {horariosFiltrados.length === 0 ? (
+                  <div className="admin-horarios-empty">
+                    <span className="material-symbols-outlined">calendar_month</span>
+                    <p>No hay solicitudes {horarioFilter !== 'todos' ? `con estado "${horarioFilter}"` : ''}.</p>
+                  </div>
+                ) : (
+                  <div className="admin-horarios-list">
+                    {horariosFiltrados.map(h => (
+                      <div key={h.id} className="admin-horario-card">
+                        <img src={h.imagenUrl} alt={`Horario ${h.profesorNombre}`} className="admin-horario-thumb"
+                          onClick={() => setPreviewImgUrl(h.imagenUrl)} title="Clic para ampliar" />
+                        <div className="admin-horario-info">
+                          <p className="admin-horario-name">{h.profesorNombre}</p>
+                          <p className="admin-horario-meta">{h.profesorCorreo} &nbsp;·&nbsp;
+                            {new Date(h.fecha).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          <div style={{ marginTop: '8px' }}>
+                            <span className={`admin-status-chip admin-status-chip--${h.estado}`}>
+                              <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+                                {h.estado === 'pendiente' ? 'pending' : h.estado === 'autorizado' ? 'check_circle' : 'cancel'}
+                              </span>
+                              {h.estado.charAt(0).toUpperCase() + h.estado.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="admin-horario-actions">
+                          {h.estado === 'pendiente' ? (
+                            <>
+                              <button className="admin-btn-authorize" onClick={() => handleAutorizarHorario(h.id)}>
+                                <span className="material-symbols-outlined">check_circle</span>Autorizar
+                              </button>
+                              <button className="admin-btn-reject" onClick={() => handleRechazarHorario(h.id)}>
+                                <span className="material-symbols-outlined">cancel</span>Rechazar
+                              </button>
+                            </>
+                          ) : (
+                            <button className="admin-btn-authorize"
+                              style={{ background: 'transparent', border: '1px solid var(--color-outline-variant)', color: 'var(--color-on-surface-variant)' }}
+                              onClick={() => setPreviewImgUrl(h.imagenUrl)}>
+                              <span className="material-symbols-outlined">visibility</span>Ver
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── SALONES ── */}
             {activeTab === 'salones' && (
               <SalonesAdminTab />
             )}
+            {/* ── USUARIOS ── */}
             {activeTab === 'usuarios' && (
               <div className="dash-card" style={{ padding: '30px', margin: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
@@ -465,34 +548,55 @@ export default function AdminDashboardPage() {
                       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid var(--color-outline-variant)' }}>
-                            {['Nombre', 'Correo', 'Tipo', 'Acciones'].map(h => (
+                            {['Nombre', 'Correo', 'Tipo', 'Estado', 'Acciones'].map(h => (
                               <th key={h} style={{ padding: '12px', color: 'var(--color-on-surface-variant)', fontWeight: 500, textAlign: h === 'Acciones' ? 'right' : 'left' }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {usuarios.map(u => (
-                            <tr key={u.id} style={{ borderBottom: '1px solid rgba(63,72,80,.4)' }}>
-                              <td style={{ padding: '16px 12px' }}>{u.nombre}</td>
-                              <td style={{ padding: '16px 12px', color: 'var(--color-on-surface-variant)' }}>{u.correo}</td>
-                              <td style={{ padding: '16px 12px' }}>
-                                <span className="dash-badge" style={{ background: u.tipo === 'admin' ? ADMIN_BG : 'rgba(146,204,255,.1)', color: u.tipo === 'admin' ? ADMIN_COLOR : 'var(--color-primary)', border: `1px solid ${u.tipo === 'admin' ? ADMIN_COLOR : 'rgba(146,204,255,.3)'}` }}>
-                                  {(u.tipo ?? 'indefinido').toUpperCase()}
-                                </span>
-                              </td>
-                              <td style={{ padding: '16px 12px', textAlign: 'right' }}>
-                                <button onClick={() => openEditForm(u)} style={{ background: 'transparent', border: 'none', color: 'var(--color-on-surface-variant)', cursor: 'pointer', marginRight: '16px' }}
-                                  onMouseOver={e => e.currentTarget.style.color = 'var(--color-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--color-on-surface-variant)'}>
-                                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>edit</span>
-                                </button>
-                                <button onClick={() => deleteUser(u.id)} style={{ background: 'transparent', border: 'none', color: '#ff6b7a', cursor: 'pointer' }}>
-                                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>delete</span>
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {usuarios.map(u => {
+                            const isUserActive = u.activo !== 0 && u.activo !== false;
+                            return (
+                              <tr key={u.id} style={{ borderBottom: '1px solid rgba(63,72,80,.4)', opacity: isUserActive ? 1 : 0.6 }}>
+                                <td style={{ padding: '16px 12px' }}>{u.nombre}</td>
+                                <td style={{ padding: '16px 12px', color: 'var(--color-on-surface-variant)' }}>{u.correo}</td>
+                                <td style={{ padding: '16px 12px' }}>
+                                  <span className="dash-badge" style={{ background: (u.rol === 2 || u.tipo === 'admin') ? ADMIN_BG : 'rgba(146,204,255,.1)', color: (u.rol === 2 || u.tipo === 'admin') ? ADMIN_COLOR : 'var(--color-primary)', border: `1px solid ${(u.rol === 2 || u.tipo === 'admin') ? ADMIN_COLOR : 'rgba(146,204,255,.3)'}` }}>
+                                    {(u.rol === 2 || u.tipo === 'admin' ? 'admin' : 'profesor').toUpperCase()}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '16px 12px' }}>
+                                  <span className="dash-badge" style={{
+                                    background: isUserActive ? 'rgba(74,225,131,.15)' : 'rgba(255,107,122,.1)',
+                                    color: isUserActive ? 'var(--color-secondary)' : '#ff6b7a',
+                                    border: `1px solid ${isUserActive ? 'rgba(74,225,131,.3)' : 'rgba(255,107,122,.3)'}`
+                                  }}>
+                                    {isUserActive ? 'ACTIVO' : 'INACTIVO'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '16px 12px', textAlign: 'right' }}>
+                                  <button onClick={() => openEditForm(u)} style={{ background: 'transparent', border: 'none', color: 'var(--color-on-surface-variant)', cursor: 'pointer', marginRight: '16px' }}
+                                    onMouseOver={e => e.currentTarget.style.color = 'var(--color-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--color-on-surface-variant)'}
+                                    title="Editar usuario">
+                                    <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>edit</span>
+                                  </button>
+                                  {isUserActive ? (
+                                    <button onClick={() => deleteUser(u.id)} style={{ background: 'transparent', border: 'none', color: '#ff6b7a', cursor: 'pointer' }}
+                                      title="Desactivar usuario">
+                                      <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>block</span>
+                                    </button>
+                                  ) : (
+                                    <button onClick={() => reactivarUser(u)} style={{ background: 'transparent', border: 'none', color: 'var(--color-secondary)', cursor: 'pointer' }}
+                                      title="Reactivar usuario">
+                                      <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>check_circle</span>
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                           {usuarios.length === 0 && (
-                            <tr><td colSpan={4} style={{ padding: '30px', textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>No hay usuarios.</td></tr>
+                            <tr><td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>No hay usuarios.</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -502,91 +606,6 @@ export default function AdminDashboardPage() {
               </div>
             )}
 
-            {/* ── HORARIOS ── */}
-            {activeTab === 'horarios' && (
-              <div className="dash-card" style={{ padding: '30px', margin: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-                  <h3 className="dash-card-title" style={{ fontSize: '24px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                    <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '28px' }}>schedule</span>
-                    Gestión de Horarios
-                  </h3>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <button className="dash-logout-btn" onClick={() => { setModalHorario(true); setErrorH('') }} style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}>
-                      <span className="material-symbols-outlined">add</span> Nuevo Horario
-                    </button>
-                  </div>
-                </div>
-
-                {/* Sección: Imágenes de horario por profesor */}
-                <div style={{ marginBottom: '32px', padding: '20px', background: 'var(--color-surface-container-high)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }}>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-on-surface-variant)' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>image</span>
-                    Imágenes de horario por profesor
-                  </h4>
-                  {loadingUsuarios ? (
-                    <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px' }}>Cargando profesores...</p>
-                  ) : usuarios.filter(u => u.tipo === 'profesor').length === 0 ? (
-                    <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px' }}>No hay profesores registrados.</p>
-                  ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {usuarios.filter(u => u.tipo === 'profesor').map(prof => (
-                        <button
-                          key={prof.id}
-                          onClick={() => abrirModalImagenHorario(prof)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            padding: '10px 16px', borderRadius: '10px',
-                            border: '1px solid var(--color-outline-variant)',
-                            background: 'transparent', color: 'var(--color-on-surface)',
-                            cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px',
-                            transition: 'all 0.2s',
-                          }}
-                          onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-primary)' }}
-                          onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--color-outline-variant)'; e.currentTarget.style.color = 'var(--color-on-surface)' }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>person</span>
-                          {prof.nombre}
-                          <span className="material-symbols-outlined" style={{ fontSize: '16px', opacity: 0.6 }}>upload_file</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {loadingHorarios ? (
-                  <div style={{ textAlign: 'center', padding: '40px' }}><div className="hor-spinner" style={{ margin: '0 auto 16px' }} /><p style={{ color: 'var(--color-on-surface-variant)' }}>Cargando horarios...</p></div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--color-outline-variant)' }}>
-                          {['Profesor', 'Salón', 'Día', 'Horario', 'Materia', ''].map(h => (
-                            <th key={h} style={{ padding: '12px', color: 'var(--color-on-surface-variant)', fontWeight: 500, textAlign: 'left', fontSize: '13px' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {horarios.map(h => (
-                          <tr key={h.id} style={{ borderBottom: '1px solid rgba(63,72,80,.4)' }}>
-                            <td style={{ padding: '14px 12px', fontSize: '14px' }}>{h.profesor?.nombre ?? h.profesor_id}</td>
-                            <td style={{ padding: '14px 12px', fontSize: '14px' }}>{h.salon?.nombre ?? h.salon_id}</td>
-                            <td style={{ padding: '14px 12px', fontSize: '14px' }}>{h.dia_semana}</td>
-                            <td style={{ padding: '14px 12px', fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>{h.hora_inicio} – {h.hora_fin}</td>
-                            <td style={{ padding: '14px 12px', fontSize: '14px' }}>{h.materia}</td>
-                            <td style={{ padding: '14px 12px' }}>
-                              <button onClick={() => eliminarHorario(h.id)} style={{ background: 'transparent', border: 'none', color: '#ff6b7a', cursor: 'pointer' }}>
-                                <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>delete</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {horarios.length === 0 && <tr><td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: 'var(--color-on-surface-variant)' }}>No hay horarios registrados.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* ── SOLICITUDES ── */}
             {activeTab === 'solicitudes' && (
@@ -743,136 +762,16 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Modal Imagen de Horario por Profesor (Admin) */}
-      {modalImagenHorario && profesorSeleccionado && (
-        <div className="hor-overlay" onClick={e => e.target === e.currentTarget && !uploadingImagen && !deletingImagen && setModalImagenHorario(false)}>
-          <div className="hor-modal">
-            <div className="hor-modal-header">
-              <div className="hor-modal-title-row">
-                <span className="material-symbols-outlined hor-modal-icon">image</span>
-                <h2 className="hor-modal-title">Imagen de horario — {profesorSeleccionado.nombre}</h2>
-              </div>
-              <button className="hor-close-btn" onClick={() => !uploadingImagen && !deletingImagen && setModalImagenHorario(false)} disabled={uploadingImagen || deletingImagen}>
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            {errorImagen && (
-              <div className="hor-error-banner"><span className="material-symbols-outlined">error</span>{errorImagen}</div>
-            )}
-            {loadingImagen ? (
-              <div className="hor-loading-area"><div className="hor-spinner" /><p className="hor-loading-text">Cargando imagen...</p></div>
-            ) : imagenHorarioUrl ? (
-              <div className="hor-preview-area">
-                <img src={imagenHorarioUrl} alt="Horario" className="hor-preview-img" />
-                {!deleteConfirmImagen ? (
-                  <div className="hor-actions">
-                    <p className="hor-hint">Para subir una nueva imagen, primero elimina la actual.</p>
-                    <button className="hor-delete-btn" onClick={() => setDeleteConfirmImagen(true)}>
-                      <span className="material-symbols-outlined">delete</span>Eliminar imagen
-                    </button>
-                  </div>
-                ) : (
-                  <div className="hor-confirm-area">
-                    <p className="hor-confirm-text">¿Estás seguro? Esta acción no se puede deshacer.</p>
-                    <div className="hor-confirm-btns">
-                      <button className="hor-cancel-btn" onClick={() => setDeleteConfirmImagen(false)} disabled={deletingImagen}>Cancelar</button>
-                      <button className="hor-confirm-delete-btn" onClick={handleEliminarImagenHorario} disabled={deletingImagen}>
-                        {deletingImagen ? <><div className="hor-btn-spinner" />Eliminando...</> : <><span className="material-symbols-outlined">delete_forever</span>Sí, eliminar</>}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="hor-upload-area">
-                <div
-                  className={`hor-drop-zone${uploadingImagen ? ' hor-drop-zone--uploading' : ''}`}
-                  onDragOver={e => { e.preventDefault() }}
-                  onDrop={e => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (file) handleSubirImagenHorario(file) }}
-                  onClick={() => !uploadingImagen && fileInputAdminRef.current?.click()}
-                >
-                  {uploadingImagen ? (
-                    <><div className="hor-spinner" /><p className="hor-drop-title">Subiendo imagen...</p><p className="hor-drop-sub">Por favor espera</p></>
-                  ) : (
-                    <><span className="material-symbols-outlined hor-upload-icon">upload_file</span>
-                    <p className="hor-drop-title">Arrastra la imagen del horario aquí</p>
-                    <p className="hor-drop-sub">o haz clic para seleccionar un archivo</p>
-                    <span className="hor-format-tag">PNG · JPG · JPEG · máx. 10 MB</span></>
-                  )}
-                </div>
-                <input ref={fileInputAdminRef} type="file" accept="image/png,image/jpeg" style={{ display: 'none' }}
-                  onChange={e => { const file = e.target.files?.[0]; if (file) handleSubirImagenHorario(file) }} />
-              </div>
-            )}
-          </div>
+      {/* Preview image modal */}
+      {previewImgUrl && (
+        <div className="admin-preview-overlay" onClick={() => setPreviewImgUrl(null)}>
+          <button className="admin-preview-close" onClick={() => setPreviewImgUrl(null)}>
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          <img src={previewImgUrl} alt="Vista previa" className="admin-preview-img" onClick={e => e.stopPropagation()} />
         </div>
       )}
 
-      {/* Modal Nuevo Horario */}
-      {modalHorario && (
-        <div className="hor-overlay" onClick={e => e.target === e.currentTarget && setModalHorario(false)}>
-          <div className="hor-modal">
-            <div className="hor-modal-header">
-              <div className="hor-modal-title-row">
-                <span className="material-symbols-outlined hor-modal-icon">schedule</span>
-                <h2 className="hor-modal-title">Nuevo Horario</h2>
-              </div>
-              <button className="hor-close-btn" onClick={() => setModalHorario(false)}><span className="material-symbols-outlined">close</span></button>
-            </div>
-            {errorH && <div className="hor-error-banner"><span className="material-symbols-outlined">error</span>{errorH}</div>}
-            <form onSubmit={guardarHorario} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>ID del Profesor</label>
-                  <select style={inputStyle} required value={hForm.profesor_id} onChange={e => setHForm(f => ({ ...f, profesor_id: e.target.value }))}>
-                    <option value="">Seleccionar...</option>
-                    {usuarios.filter(u => u.tipo === 'profesor').map(u => (
-                      <option key={u.id} value={u.id}>{u.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>Salón</label>
-                  <select style={inputStyle} required value={hForm.salon_id} onChange={e => setHForm(f => ({ ...f, salon_id: e.target.value }))}>
-                    <option value="">Seleccionar...</option>
-                    {aulas.map(a => (
-                      <option key={a.id} value={a.id}>{a.label.startsWith('Salón') ? a.label : `Salón ${a.label}`}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 130px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>Día</label>
-                  <select style={inputStyle} value={hForm.dia_semana} onChange={e => setHForm(f => ({ ...f, dia_semana: e.target.value as DiaSemana }))}>
-                    {(['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'] as DiaSemana[]).map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ flex: '1 1 100px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>Inicio</label>
-                  <input type="time" required style={inputStyle} value={hForm.hora_inicio} onChange={e => setHForm(f => ({ ...f, hora_inicio: e.target.value }))} />
-                </div>
-                <div style={{ flex: '1 1 100px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>Fin</label>
-                  <input type="time" required style={inputStyle} value={hForm.hora_fin} onChange={e => setHForm(f => ({ ...f, hora_fin: e.target.value }))} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>Materia</label>
-                <input type="text" required style={inputStyle} placeholder="Ej. Programación Web" value={hForm.materia} onChange={e => setHForm(f => ({ ...f, materia: e.target.value }))} />
-              </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button type="button" className="hor-cancel-btn" onClick={() => setModalHorario(false)} disabled={creandoH}>Cancelar</button>
-                <button type="submit" className="dash-logout-btn" disabled={creandoH} style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)', background: 'rgba(146,204,255,.1)' }}>
-                  {creandoH ? <><div className="hor-btn-spinner" />Guardando...</> : <><span className="material-symbols-outlined">save</span>Guardar</>}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

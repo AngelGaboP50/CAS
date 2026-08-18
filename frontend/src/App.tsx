@@ -1,5 +1,6 @@
-// src/App.tsx — REEMPLAZA el archivo actual completo
-// Agrega rutas protegidas con ProtectedRoute
+// src/App.tsx
+// Rutas de la aplicación. Las rutas del Profesor están anidadas dentro de AppShell
+// que provee el sidebar lateral permanente.
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
@@ -13,6 +14,7 @@ import SolicitudesPage from './pages/SolicitudesPage'
 import NotificacionesPage from './pages/NotificacionesPage'
 import SimulacionPuertaPage from './pages/SimulacionPuertaPage'
 import QrAccessPage from './pages/QrAccessPage'
+import AppShell from './components/AppShell'
 import ProtectedRoute from './guards/ProtectedRoute'
 import './App.css'
 
@@ -20,7 +22,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Públicas */}
+        {/* ── Públicas ─────────────────────────────────────────── */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -28,41 +30,29 @@ function App() {
         <Route path="/simulacion/:salon_id?" element={<SimulacionPuertaPage />} />
         <Route path="/qr-access/:salon_id?" element={<QrAccessPage />} />
 
-        {/* Profesor */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute requiredRole="profesor">
-            <DashboardPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/salones" element={
-          <ProtectedRoute requiredRole="profesor">
-            <SalonesPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/mis-accesos" element={
-          <ProtectedRoute requiredRole="profesor">
-            <HistorialAccesosPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/solicitudes" element={
-          <ProtectedRoute requiredRole="profesor">
-            <SolicitudesPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/notificaciones" element={
-          <ProtectedRoute>
-            <NotificacionesPage />
-          </ProtectedRoute>
-        } />
+        {/* ── Profesor: AppShell como layout wrapper ───────────── */}
+        <Route
+          element={
+            <ProtectedRoute requiredRole="profesor">
+              <AppShell />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard"       element={<DashboardPage />} />
+          <Route path="/salones"         element={<SalonesPage />} />
+          <Route path="/mis-accesos"     element={<HistorialAccesosPage />} />
+          <Route path="/solicitudes"     element={<SolicitudesPage />} />
+          <Route path="/notificaciones"  element={<NotificacionesPage />} />
+        </Route>
 
-        {/* Admin */}
+        {/* ── Admin ─────────────────────────────────────────────── */}
         <Route path="/admin" element={
           <ProtectedRoute requiredRole="admin">
             <AdminDashboardPage />
           </ProtectedRoute>
         } />
 
-        {/* Catch-all */}
+        {/* ── Catch-all ─────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

@@ -18,6 +18,7 @@ function DashboardPage() {
   // ── Horario modal state ──────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false)
   const [horarioUrl, setHorarioUrl] = useState<string | null>(null)
+  const [horarioEstado, setHorarioEstado] = useState<'pendiente' | 'autorizado' | 'rechazado' | null>(null)
   const [loadingHorario, setLoadingHorario] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -72,8 +73,13 @@ function DashboardPage() {
           .getPublicUrl(`${HORARIOS_FOLDER}/${userId}/${archivo.name}`)
         // Agregar timestamp para evitar caché
         setHorarioUrl(`${urlData.publicUrl}?t=${Date.now()}`)
+        // Leer el estado guardado localmente
+        const estadoGuardado = localStorage.getItem(`horario_estado_${userId}`) as 'pendiente' | 'autorizado' | 'rechazado' | null
+        setHorarioEstado(estadoGuardado ?? 'pendiente')
       } else {
         setHorarioUrl(null)
+        setHorarioEstado(null)
+        localStorage.removeItem(`horario_estado_${userId}`)
       }
     } catch (err: any) {
       setErrorMsg('No se pudo cargar el horario. Intenta de nuevo.')
@@ -124,20 +130,23 @@ function DashboardPage() {
       const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
       const path = `${HORARIOS_FOLDER}/${usuario.id}/horario.${ext}`
 
-      // upsert: sobreescribe si ya existe (no debería llegar aquí con uno cargado,
-      // pero como salvaguarda lo dejamos en upsert)
+      // upsert: sobreescribe si ya existe
       const { error } = await supabase.storage
         .from(BUCKET)
         .upload(path, file, { upsert: true, contentType: file.type })
 
       if (error) throw error
 
+      // Marcar el horario como PENDIENTE de autorización
+      localStorage.setItem(`horario_estado_${usuario.id}`, 'pendiente')
+      setHorarioEstado('pendiente')
+
       await fetchHorario()
       
       // Notificamos a los administradores del cambio
       await notificarAdmins(
-        'Horario Actualizado',
-        `El profesor ${usuario.nombre} ha subido su archivo de horario.`,
+        'Horario Pendiente de Revisión',
+        `El profesor ${usuario.nombre} ha subido su horario y está esperando autorización.`,
         'info'
       )
     } catch (err: any) {
@@ -187,7 +196,10 @@ function DashboardPage() {
       }
 
       setHorarioUrl(null)
+      setHorarioEstado(null)
       setDeleteConfirm(false)
+      // Limpiar el estado guardado localmente
+      localStorage.removeItem(`horario_estado_${usuario.id}`)
       
       // Notificamos a los administradores del cambio
       await notificarAdmins(
@@ -269,8 +281,15 @@ function DashboardPage() {
             <span className="material-symbols-outlined dash-card-icon">calendar_month</span>
             <h3 className="dash-card-title">Mis Horarios</h3>
             <p className="dash-card-desc">Visualiza tus horarios asignados por salón y día.</p>
-            <span className={`dash-card-tag${horarioUrl ? ' dash-card-tag--active' : ''}`}>
-              {horarioUrl ? 'Ver horario' : 'Subir horario'}
+            <span className={`dash-card-tag${
+              horarioEstado === 'pendiente' ? ' dash-card-tag--pending' :
+              horarioEstado === 'autorizado' ? ' dash-card-tag--active' :
+              horarioEstado === 'rechazado' ? ' dash-card-tag--rejected' : ''
+            }`}>
+              {horarioEstado === 'pendiente' ? '⏳ Pendiente de aprobación' :
+               horarioEstado === 'autorizado' ? '✅ Autorizado' :
+               horarioEstado === 'rechazado' ? '❌ Rechazado' :
+               horarioUrl ? 'Ver horario' : 'Subir horario'}
             </span>
           </div>
 
@@ -331,11 +350,51 @@ function DashboardPage() {
             ) : horarioUrl ? (
               /* ── Vista de horario cargado ── */
               <div className="hor-preview-area">
+                {/* Badge de estado */}
+                <div className="hor-status-row">
+                  {horarioEstado === 'pendiente' && (
+                    <span className="hor-status-badge hor-status-badge--pending">
+                      <span className="material-symbols-outlined">pending</span>
+                      Pendiente de aprobación
+                    </span>
+                  )}
+                  {horarioEstado === 'autorizado' && (
+                    <span className="hor-status-badge hor-status-badge--authorized">
+                      <span className="material-symbols-outlined">check_circle</span>
+                      Autorizado
+                    </span>
+                  )}
+                  {horarioEstado === 'rechazado' && (
+                    <span className="hor-status-badge hor-status-badge--rejected">
+                      <span className="material-symbols-outlined">cancel</span>
+                      Rechazado
+                    </span>
+                  )}
+                </div>
+
                 <img src={horarioUrl} alt="Mi horario" className="hor-preview-img" id="img-horario-preview" />
+
+                {/* Aviso según estado */}
+                {horarioEstado === 'pendiente' && (
+                  <div className="hor-pending-notice">
+                    <span className="material-symbols-outlined">info</span>
+                    <span>Tu horario está siendo revisado por el administrador. Recibirás una notificación cuando sea autorizado.</span>
+                  </div>
+                )}
+                {horarioEstado === 'rechazado' && (
+                  <div className="hor-rejected-notice">
+                    <span className="material-symbols-outlined">error</span>
+                    <span>Tu horario fue rechazado por el administrador. Elimínalo y sube uno nuevo.</span>
+                  </div>
+                )}
 
                 {!deleteConfirm ? (
                   <div className="hor-actions">
-                    <p className="hor-hint">Para subir un nuevo horario, primero elimina el actual.</p>
+                    <p className="hor-hint">
+                      {horarioEstado === 'pendiente'
+                        ? 'Puedes reemplazar tu horario subiendo uno nuevo (cancelará el actual).'
+                        : 'Para subir un nuevo horario, primero elimina el actual.'}
+                    </p>
                     <button
                       className="hor-delete-btn"
                       onClick={() => setDeleteConfirm(true)}

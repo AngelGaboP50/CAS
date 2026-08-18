@@ -61,7 +61,7 @@ export default function QrAccessPage() {
           } else {
             const fakeReq = {
               salon_id: currentSalonId,
-              fecha: new Date().toISOString().split('T')[0],
+              fecha: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
               hora_inicio: new Date().toLocaleTimeString('es-MX', { hour12: false, hour: '2-digit', minute:'2-digit' }),
               hora_fin: new Date(Date.now() + 3600*1000).toLocaleTimeString('es-MX', { hour12: false, hour: '2-digit', minute:'2-digit' }),
               motivo: 'Apertura inmediata QR'
@@ -143,9 +143,10 @@ export default function QrAccessPage() {
   }
 
   const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60)
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
     const s = seconds % 60
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
   if (loading) {

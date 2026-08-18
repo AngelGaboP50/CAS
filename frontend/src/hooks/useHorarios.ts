@@ -1,8 +1,7 @@
 // src/hooks/useHorarios.ts
-// Hook para gestionar horarios estructurados en la BD
+// Frontend Mock Mode
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../supabaseClient'
+import { useState, useCallback } from 'react'
 
 export type DiaSemana = 'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES' | 'SABADO'
 
@@ -11,12 +10,11 @@ export interface Horario {
   profesor_id: number
   salon_id: string
   dia_semana: DiaSemana
-  hora_inicio: string   // "HH:MM"
-  hora_fin: string      // "HH:MM"
+  hora_inicio: string
+  hora_fin: string
   materia: string
   activo: boolean
   created_at: string
-  // Joined
   salon?: { nombre: string }
   profesor?: { nombre: string; correo: string }
 }
@@ -30,84 +28,53 @@ export interface NuevoHorario {
   materia: string
 }
 
-export function useHorarios(profesorId?: number) {
-  const [horarios, setHorarios] = useState<Horario[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+const INITIAL_HORARIOS: Horario[] = []
+
+export function useHorarios(_profesorId?: number) {
+  const [horarios, setHorarios] = useState<Horario[]>(() => {
+    const local = sessionStorage.getItem('mock_horarios')
+    return local ? JSON.parse(local) : INITIAL_HORARIOS
+  })
+  const [loading] = useState(false)
+  const [error] = useState<string | null>(null)
 
   const fetchHorarios = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    let query = supabase
-      .from('horarios')
-      .select(`
-        *,
-        salon:salones(nombre),
-        profesor:usuarios(nombre, correo)
-      `)
-      .eq('activo', true)
-      .order('dia_semana')
-      .order('hora_inicio')
-
-    if (profesorId) query = query.eq('profesor_id', profesorId)
-
-    const { data, error: err } = await query
-
-    if (err) {
-      setError(err.message)
-    } else {
-      setHorarios((data as Horario[]) ?? [])
-    }
-    setLoading(false)
-  }, [profesorId])
-
-  useEffect(() => {
-    fetchHorarios()
-
-    const channel = supabase
-      .channel('horarios_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'horarios' }, () => {
-        fetchHorarios()
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [fetchHorarios])
+    // No-op en modo mock
+  }, [])
 
   const crearHorario = async (horario: NuevoHorario) => {
-    const { error: err } = await supabase.from('horarios').insert([horario])
-    if (err) throw err
-    await fetchHorarios()
+    const nuevo: Horario = {
+      id: `hor-${Date.now()}`,
+      profesor_id: horario.profesor_id,
+      salon_id: horario.salon_id,
+      dia_semana: horario.dia_semana,
+      hora_inicio: horario.hora_inicio,
+      hora_fin: horario.hora_fin,
+      materia: horario.materia,
+      activo: true,
+      created_at: new Date().toISOString(),
+      salon: { nombre: `Salón ${horario.salon_id}` },
+      profesor: { nombre: 'Profesor Seleccionado', correo: 'profesor@uteq.edu.mx' }
+    }
+    const updated = [...horarios, nuevo]
+    setHorarios(updated)
+    sessionStorage.setItem('mock_horarios', JSON.stringify(updated))
   }
 
   const eliminarHorario = async (id: string) => {
-    const { error: err } = await supabase
-      .from('horarios')
-      .update({ activo: false })
-      .eq('id', id)
-    if (err) throw err
-    await fetchHorarios()
+    const updated = horarios.filter(h => h.id !== id)
+    setHorarios(updated)
+    sessionStorage.setItem('mock_horarios', JSON.stringify(updated))
   }
 
   const editarHorario = async (id: string, datos: Partial<NuevoHorario>) => {
-    const { error: err } = await supabase
-      .from('horarios')
-      .update(datos)
-      .eq('id', id)
-    if (err) throw err
-    await fetchHorarios()
+    const updated = horarios.map(h => h.id === id ? { ...h, ...datos } : h)
+    setHorarios(updated)
+    sessionStorage.setItem('mock_horarios', JSON.stringify(updated))
   }
 
-  // Horario del día actual del profesor
   const horarioHoy = (): Horario[] => {
-    const dias: Record<number, DiaSemana> = {
-      1: 'LUNES', 2: 'MARTES', 3: 'MIERCOLES',
-      4: 'JUEVES', 5: 'VIERNES', 6: 'SABADO',
-    }
-    const hoy = dias[new Date().getDay()] as DiaSemana | undefined
-    if (!hoy) return []
-    return horarios.filter(h => h.dia_semana === hoy)
+    return horarios
   }
 
   return { horarios, loading, error, fetchHorarios, crearHorario, eliminarHorario, editarHorario, horarioHoy }

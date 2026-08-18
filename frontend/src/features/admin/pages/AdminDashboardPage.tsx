@@ -29,7 +29,7 @@ function AdminDashboardPage() {
   const dateStr = currentDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   // Estado para las pestañas (Tabs del Sidebar)
-  const [activeTab, setActiveTab] = useState<'principal' | 'usuarios' | 'perfil'>('principal')
+  const [activeTab, setActiveTab] = useState<'principal' | 'usuarios' | 'horarios' | 'perfil'>('principal')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // Estado para usuarios
@@ -51,6 +51,62 @@ function AdminDashboardPage() {
 
   // Hook para Aulas (Control de Salones)
   const { aulas, updateEstadoAula } = useAulas()
+
+  // ── Estado para la sección de Horarios ─────────────────────────────
+  type EstadoHorario = 'pendiente' | 'autorizado' | 'rechazado'
+  const [horarioFilter, setHorarioFilter] = useState<EstadoHorario | 'todos'>('pendiente')
+  const [previewImg, setPreviewImg] = useState<string | null>(null)
+  const [horariosData, setHorariosData] = useState<Array<{
+    id: string
+    profesorNombre: string
+    profesorCorreo: string
+    imagenUrl: string
+    estado: EstadoHorario
+    fecha: string
+  }>>([
+    {
+      id: '1',
+      profesorNombre: 'Ana López',
+      profesorCorreo: 'ana.lopez@ejemplo.edu.mx',
+      imagenUrl: 'https://placehold.co/400x300/1e1f26/92ccff?text=Horario+Ana',
+      estado: 'pendiente',
+      fecha: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    },
+    {
+      id: '2',
+      profesorNombre: 'Carlos Mendoza',
+      profesorCorreo: 'c.mendoza@ejemplo.edu.mx',
+      imagenUrl: 'https://placehold.co/400x300/1e1f26/92ccff?text=Horario+Carlos',
+      estado: 'pendiente',
+      fecha: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    },
+    {
+      id: '3',
+      profesorNombre: 'Marta Ramírez',
+      profesorCorreo: 'm.ramirez@ejemplo.edu.mx',
+      imagenUrl: 'https://placehold.co/400x300/1e1f26/4ae183?text=Horario+Marta',
+      estado: 'autorizado',
+      fecha: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    },
+  ])
+
+  const handleAutorizarHorario = (id: string) => {
+    setHorariosData(prev =>
+      prev.map(h => h.id === id ? { ...h, estado: 'autorizado' as EstadoHorario } : h)
+    )
+  }
+
+  const handleRechazarHorario = (id: string) => {
+    setHorariosData(prev =>
+      prev.map(h => h.id === id ? { ...h, estado: 'rechazado' as EstadoHorario } : h)
+    )
+  }
+
+  const horariosFiltrados = horariosData.filter(h =>
+    horarioFilter === 'todos' ? true : h.estado === horarioFilter
+  )
+
+  const pendientesCount = horariosData.filter(h => h.estado === 'pendiente').length
 
   const handleUpdateEstado = async (id: string, estadoActual: EstadoAula) => {
     const estadosPermitidos: EstadoAula[] = ['LIBRE', 'EN_CLASE', 'ALERTA', 'EXCEPCION', 'NO_DISPONIBLE'];
@@ -250,6 +306,37 @@ function AdminDashboardPage() {
           </button>
           
           <button 
+            style={{
+              ...sidebarItemStyle(activeTab === 'horarios'),
+              position: 'relative'
+            }} 
+            onClick={() => setActiveTab('horarios')}
+            title="Horarios"
+          >
+            <span className="material-symbols-outlined">pending_actions</span>
+            {isSidebarOpen && <span>Horarios</span>}
+            {pendientesCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '6px',
+                right: isSidebarOpen ? '12px' : '6px',
+                background: '#fbd38d',
+                color: '#111319',
+                fontSize: '10px',
+                fontWeight: 700,
+                minWidth: '16px',
+                height: '16px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 4px',
+                boxShadow: '0 0 0 2px var(--color-bg)'
+              }}>{pendientesCount}</span>
+            )}
+          </button>
+          
+          <button 
             style={sidebarItemStyle(activeTab === 'perfil')} 
             onClick={() => setActiveTab('perfil')}
             title="Perfil"
@@ -304,63 +391,139 @@ function AdminDashboardPage() {
                 </div>
 
                 <InteractiveMap />
+              </>
+            )}
 
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', gap: '8px' }}>
-                  <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)' }}>door_open</span>
-                  <h3 style={{ fontSize: '20px', margin: 0, fontWeight: 600 }}>Control de Salones</h3>
+            {/* ── PESTAÑA HORARIOS ── */}
+            {activeTab === 'horarios' && (
+              <div className="dash-card" style={{ padding: '30px', margin: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                  <h3 className="dash-card-title" style={{ fontSize: '24px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '28px' }}>pending_actions</span>
+                    Horarios de Profesores
+                  </h3>
+                  <span style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
+                    {pendientesCount} pendiente{pendientesCount !== 1 ? 's' : ''} de autorización
+                  </span>
                 </div>
 
-                <div className="dash-cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
-                  {aulas.length === 0 ? (
-                    <p style={{ color: 'var(--color-on-surface-variant)', gridColumn: '1 / -1' }}>No hay salones registrados en la base de datos o conectando...</p>
-                  ) : (
-                    aulas.map((aula) => (
-                      <div className="dash-card" key={aula.id}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                          <span className="material-symbols-outlined dash-card-icon" style={{ 
-                            color: aula.estado === 'NO_DISPONIBLE' ? 'var(--color-on-surface-variant)' : 
-                                   aula.estado === 'LIBRE' ? 'var(--color-secondary)' : 
-                                   aula.estado === 'EN_CLASE' ? 'var(--color-primary)' : 
-                                   '#ff6b7a', // alerta / excepcion
-                            fontSize: '50px' 
-                          }}>
-                            meeting_room
-                          </span>
-                          <span className="dash-badge" style={{ 
-                            background: aula.estado === 'NO_DISPONIBLE' ? 'rgba(255,255,255,0.05)' :
-                                        aula.estado === 'LIBRE' ? 'rgba(74,225,131,.15)' :
-                                        aula.estado === 'EN_CLASE' ? 'rgba(146,204,255,.1)' :
-                                        'rgba(255, 107, 122, 0.1)', 
-                            color: aula.estado === 'NO_DISPONIBLE' ? 'var(--color-on-surface-variant)' :
-                                   aula.estado === 'LIBRE' ? 'var(--color-secondary)' :
-                                   aula.estado === 'EN_CLASE' ? 'var(--color-primary)' :
-                                   '#ff6b7a',
-                            border: 'none', margin: 0 
-                          }}>
-                            {aula.estado.replace('_', ' ')}
-                          </span>
+                {/* Filtro de tabs */}
+                <div className="admin-hor-tabs">
+                  <button
+                    className={`admin-hor-tab${horarioFilter === 'pendiente' ? ' admin-hor-tab--active' : ''}`}
+                    onClick={() => setHorarioFilter('pendiente')}
+                  >
+                    <span className="material-symbols-outlined">pending</span>
+                    Pendientes
+                    {pendientesCount > 0 && (
+                      <span className="admin-hor-tab-count">{pendientesCount}</span>
+                    )}
+                  </button>
+                  <button
+                    className={`admin-hor-tab${horarioFilter === 'autorizado' ? ' admin-hor-tab--active' : ''}`}
+                    onClick={() => setHorarioFilter('autorizado')}
+                  >
+                    <span className="material-symbols-outlined">check_circle</span>
+                    Autorizados
+                  </button>
+                  <button
+                    className={`admin-hor-tab${horarioFilter === 'rechazado' ? ' admin-hor-tab--active' : ''}`}
+                    onClick={() => setHorarioFilter('rechazado')}
+                  >
+                    <span className="material-symbols-outlined">cancel</span>
+                    Rechazados
+                  </button>
+                  <button
+                    className={`admin-hor-tab${horarioFilter === 'todos' ? ' admin-hor-tab--active' : ''}`}
+                    onClick={() => setHorarioFilter('todos')}
+                  >
+                    <span className="material-symbols-outlined">list</span>
+                    Todos
+                  </button>
+                </div>
+
+                {/* Lista de solicitudes */}
+                {horariosFiltrados.length === 0 ? (
+                  <div className="admin-horarios-empty">
+                    <span className="material-symbols-outlined">calendar_month</span>
+                    <p>No hay solicitudes {horarioFilter !== 'todos' ? `con estado "${horarioFilter}"` : ''}.</p>
+                  </div>
+                ) : (
+                  <div className="admin-horarios-list">
+                    {horariosFiltrados.map(h => (
+                      <div key={h.id} className="admin-horario-card">
+                        {/* Miniatura */}
+                        <img
+                          src={h.imagenUrl}
+                          alt={`Horario de ${h.profesorNombre}`}
+                          className="admin-horario-thumb"
+                          onClick={() => setPreviewImg(h.imagenUrl)}
+                          title="Clic para ampliar"
+                        />
+
+                        {/* Info del profesor */}
+                        <div className="admin-horario-info">
+                          <p className="admin-horario-name">{h.profesorNombre}</p>
+                          <p className="admin-horario-meta">
+                            {h.profesorCorreo} &nbsp;·&nbsp;
+                            {new Date(h.fecha).toLocaleString('es-MX', {
+                              day: 'numeric', month: 'short',
+                              hour: '2-digit', minute: '2-digit'
+                            })}
+                          </p>
+                          <div style={{ marginTop: '8px' }}>
+                            <span className={`admin-status-chip admin-status-chip--${h.estado}`}>
+                              {h.estado === 'pendiente' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>pending</span>}
+                              {h.estado === 'autorizado' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>check_circle</span>}
+                              {h.estado === 'rechazado' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>cancel</span>}
+                              {h.estado.charAt(0).toUpperCase() + h.estado.slice(1)}
+                            </span>
+                          </div>
                         </div>
-                        <h3 className="dash-card-title" style={{ fontSize: '22px' }}>{aula.label.startsWith('Salón') ? aula.label : `Salón ${aula.label}`}</h3>
-                        <p className="dash-card-desc">Control local para este espacio. Revisa el historial de actividad y edita su estado actual.</p>
-                        
-                        <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-                          <button 
-                            className="dash-logout-btn" 
-                            style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-outline-variant)' }}
-                            onClick={() => handleUpdateEstado(aula.id, aula.estado)}
-                            title="Cambiar Estado"
-                          >
-                            <span className="material-symbols-outlined">swap_horiz</span> Cambiar
-                          </button>
-                          <button className="dash-logout-btn" style={{ flex: 1, justifyContent: 'center', borderColor: 'var(--color-outline-variant)' }}>
-                            <span className="material-symbols-outlined">history</span> Historial
-                          </button>
+
+                        {/* Acciones */}
+                        <div className="admin-horario-actions">
+                          {h.estado === 'pendiente' && (
+                            <>
+                              <button
+                                className="admin-btn-authorize"
+                                onClick={() => handleAutorizarHorario(h.id)}
+                                title="Autorizar horario"
+                              >
+                                <span className="material-symbols-outlined">check_circle</span>
+                                Autorizar
+                              </button>
+                              <button
+                                className="admin-btn-reject"
+                                onClick={() => handleRechazarHorario(h.id)}
+                                title="Rechazar horario"
+                              >
+                                <span className="material-symbols-outlined">cancel</span>
+                                Rechazar
+                              </button>
+                            </>
+                          )}
+                          {h.estado !== 'pendiente' && (
+                            <button
+                              className="admin-btn-authorize"
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid var(--color-outline-variant)',
+                                color: 'var(--color-on-surface-variant)'
+                              }}
+                              onClick={() => setPreviewImg(h.imagenUrl)}
+                              title="Ver horario"
+                            >
+                              <span className="material-symbols-outlined">visibility</span>
+                              Ver
+                            </button>
+                          )}
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* ── PESTAÑA USUARIOS ── */}
@@ -525,6 +688,27 @@ function AdminDashboardPage() {
         </main>
       </div>
 
+      {/* ── Preview Modal (Horario imagen grande) ── */}
+      {previewImg && (
+        <div
+          className="admin-preview-overlay"
+          onClick={() => setPreviewImg(null)}
+        >
+          <button
+            className="admin-preview-close"
+            onClick={() => setPreviewImg(null)}
+            title="Cerrar vista previa"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          <img
+            src={previewImg}
+            alt="Vista previa del horario"
+            className="admin-preview-img"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }

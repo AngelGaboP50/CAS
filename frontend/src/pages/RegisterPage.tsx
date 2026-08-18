@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import './LoginPage.css'
 
-import { supabase } from '../supabaseClient'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
 function RegisterPage() {
   const navigate = useNavigate()
   const [nombre, setNombre] = useState('')
@@ -33,42 +34,24 @@ function RegisterPage() {
     setLoading(true)
 
     try {
-      // 1. Registrar el usuario en supabase auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: correo,
-        password: password,
+      const res = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, correo, password }),
       })
 
-      if (authError) throw authError
+      const data = await res.json()
 
-      // 2. Si se creó el usuario en Auth, insertamos su perfil en nuestra tabla pública 'usuarios'
-      if (authData.user) {
-        const { error: dbError } = await supabase
-          .from('usuarios')
-          .insert([
-            {
-              nombre: nombre,
-              correo: correo,
-              tipo: 'profesor' // Valor predeterminado según el enum del script
-            }
-          ])
-        
-        if (dbError) throw dbError
+      if (!res.ok) throw new Error(data.error || 'Error al crear la cuenta')
 
-        setSuccess('¡Cuenta creada exitosamente! Redirigiendo al inicio de sesión...')
-        setTimeout(() => navigate('/login'), 2000)
-      }
+      setSuccess('¡Cuenta creada exitosamente! Redirigiendo al inicio de sesión...')
+      setTimeout(() => navigate('/login'), 2000)
+
     } catch (err: any) {
       setError(err.message || 'Error al crear la cuenta')
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleGoogleRegister = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-    })
   }
 
   return (
@@ -247,22 +230,7 @@ function RegisterPage() {
                 {!loading && <span className="material-symbols-outlined icon-sm">person_add</span>}
               </button>
 
-              <div className="divider">
-                <div className="divider-line" />
-                <span className="divider-text">O</span>
-                <div className="divider-line" />
-              </div>
 
-              <button type="button" className="btn-google" id="btn-google-register" onClick={handleGoogleRegister} disabled={loading}>
-                <svg className="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  <path fill="none" d="M0 0h48v48H0z"/>
-                </svg>
-                Registrarse con Google
-              </button>
             </form>
 
             <div className="help-links" style={{ justifyContent: 'center' }}>

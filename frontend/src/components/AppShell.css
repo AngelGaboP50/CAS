@@ -1,0 +1,424 @@
+/* ─── AppShell.css ─────────────────────────────────────────────
+   Layout principal: Sidebar izquierdo + Content area derecha
+   Tokens reutilizados de DashboardPage.css
+──────────────────────────────────────────────────────────────── */
+
+/* ─── Tokens globales ─────────────────────────────────────────── */
+:root {
+  --color-bg: #111319;
+  --color-surface-container: #1e1f26;
+  --color-surface-container-high: #282a30;
+  --color-primary: #92ccff;
+  --color-secondary: #4ae183;
+  --color-on-surface: #e2e2eb;
+  --color-on-surface-variant: #bfc7d2;
+  --color-outline-variant: #3f4850;
+  --sidebar-width: 240px;
+  --topbar-height: 56px;
+}
+
+/* ─── Shell Root ─────────────────────────────────────────────── */
+.shell-root {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  background-image:
+    linear-gradient(rgba(25, 27, 34, .18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(25, 27, 34, .18) 1px, transparent 1px);
+  background-size: 40px 40px;
+  font-family: 'Inter', sans-serif;
+  color: var(--color-on-surface);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ─── Glows de fondo ─────────────────────────────────────────── */
+.shell-glow {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(130px);
+  animation: shellPulse 8s ease-in-out infinite alternate;
+  z-index: 0;
+}
+.shell-glow-1 {
+  width: 500px;
+  height: 500px;
+  top: -120px;
+  right: -80px;
+  background: rgba(146, 204, 255, .055);
+}
+.shell-glow-2 {
+  width: 400px;
+  height: 400px;
+  bottom: -60px;
+  left: var(--sidebar-width);
+  background: rgba(74, 225, 131, .04);
+  animation-delay: 4s;
+}
+@keyframes shellPulse {
+  from { opacity: .5; transform: scale(1); }
+  to   { opacity: 1;  transform: scale(1.12); }
+}
+
+/* ─── Sidebar ─────────────────────────────────────────────────── */
+.shell-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  height: 100vh;
+  background: rgba(17, 19, 25, .92);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid var(--color-outline-variant);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  transition: transform .28s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* Branding en el sidebar */
+.shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid var(--color-outline-variant);
+}
+.shell-brand-bar {
+  width: 4px;
+  height: 32px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, var(--color-primary), var(--color-secondary));
+}
+.shell-brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 1.5px;
+  margin: 0;
+  line-height: 1.2;
+}
+.shell-brand-sub {
+  font-size: 11px;
+  color: var(--color-on-surface-variant);
+  margin: 2px 0 0;
+  letter-spacing: .3px;
+}
+
+/* Nav del sidebar */
+.shell-nav {
+  flex: 1;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.shell-nav::-webkit-scrollbar { width: 4px; }
+.shell-nav::-webkit-scrollbar-thumb { background: var(--color-outline-variant); border-radius: 2px; }
+
+.shell-nav-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--color-on-surface-variant);
+  text-transform: uppercase;
+  padding: 14px 10px 6px;
+  opacity: .6;
+}
+
+/* Botón de nav item */
+.shell-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-on-surface-variant);
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background .18s, color .18s;
+  position: relative;
+}
+.shell-nav-item .material-symbols-outlined {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.shell-nav-item:hover {
+  background: rgba(255, 255, 255, .05);
+  color: var(--color-on-surface);
+}
+.shell-nav-item.active {
+  background: rgba(146, 204, 255, .12);
+  color: var(--color-primary);
+}
+.shell-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  height: 60%;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--color-primary);
+}
+
+/* Badge de notificaciones en el nav */
+.shell-nav-badge {
+  margin-left: auto;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+/* Perfil en la parte inferior del sidebar */
+.shell-profile {
+  padding: 14px 14px 18px;
+  border-top: 1px solid var(--color-outline-variant);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.shell-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(146, 204, 255, .2), rgba(74, 225, 131, .2));
+  border: 1px solid rgba(146, 204, 255, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.shell-avatar .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--color-primary);
+}
+.shell-profile-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shell-profile-role {
+  font-size: 11px;
+  color: var(--color-secondary);
+  margin: 1px 0 0;
+  font-weight: 500;
+}
+
+/* ─── Main Area (derecha) ─────────────────────────────────────── */
+.shell-main {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Topbar ─────────────────────────────────────────────────── */
+.shell-topbar {
+  height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--color-outline-variant);
+  background: rgba(17, 19, 25, .75);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 16px;
+}
+
+/* Indicador en vivo en topbar */
+.shell-live {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--color-on-surface-variant);
+}
+.shell-live-dot-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-secondary);
+  font-weight: 500;
+}
+.shell-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-secondary);
+  box-shadow: 0 0 8px rgba(74, 225, 131, .6);
+  animation: liveBlink 1.5s infinite alternate;
+}
+@keyframes liveBlink {
+  0%   { opacity: .3; }
+  100% { opacity: 1; }
+}
+
+/* Acciones del topbar */
+.shell-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* Botón ícono del topbar */
+.shell-icon-btn {
+  background: transparent;
+  border: 1px solid var(--color-outline-variant);
+  color: var(--color-on-surface-variant);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+  padding: 0;
+}
+.shell-icon-btn:hover {
+  background: rgba(255, 255, 255, .05);
+  color: var(--color-on-surface);
+}
+.shell-icon-btn .material-symbols-outlined { font-size: 19px; }
+
+/* Badge de notificaciones en topbar */
+.shell-topbar-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  height: 15px;
+  min-width: 15px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+/* Botón logout en topbar */
+.shell-logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-outline-variant);
+  background: transparent;
+  color: var(--color-on-surface-variant);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .2s;
+}
+.shell-logout-btn:hover {
+  border-color: #ff6b7a;
+  color: #ff6b7a;
+  background: rgba(255, 107, 122, .08);
+}
+.shell-logout-btn .material-symbols-outlined { font-size: 17px; }
+
+/* Título de sección en el topbar */
+.shell-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  margin: 0;
+  white-space: nowrap;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ─── Content Area ───────────────────────────────────────────── */
+.shell-content {
+  flex: 1;
+  padding: 36px 36px 40px;
+  box-sizing: border-box;
+  max-width: 1080px;
+  width: 100%;
+}
+
+/* ─── Hamburger (mobile) ─────────────────────────────────────── */
+.shell-hamburger {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--color-outline-variant);
+  color: var(--color-on-surface-variant);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.shell-hamburger .material-symbols-outlined { font-size: 20px; }
+
+/* Overlay mobile */
+.shell-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 90;
+  backdrop-filter: blur(2px);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .shell-sidebar {
+    transform: translateX(-100%);
+  }
+  .shell-sidebar.open {
+    transform: translateX(0);
+  }
+  .shell-overlay.open {
+    display: block;
+  }
+  .shell-main {
+    margin-left: 0;
+  }
+  .shell-hamburger {
+    display: flex;
+  }
+  .shell-content {
+    padding: 24px 18px 32px;
+  }
+  .shell-live {
+    display: none;
+  }
+}

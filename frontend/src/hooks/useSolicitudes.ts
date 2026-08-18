@@ -1,9 +1,7 @@
 // src/hooks/useSolicitudes.ts
-// Hook para gestionar solicitudes de salón de profesores externos
+// Frontend Mock Mode
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../supabaseClient'
-import { notificarAdmins } from './useNotificaciones'
+import { useState, useCallback } from 'react'
 
 export type EstadoSolicitud = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA'
 
@@ -20,7 +18,6 @@ export interface Solicitud {
   respuesta: string | null
   created_at: string
   updated_at: string
-  // Joined
   salon?: { nombre: string }
   profesor?: { nombre: string; correo: string }
 }
@@ -33,64 +30,40 @@ export interface NuevaSolicitud {
   motivo: string
 }
 
-export function useSolicitudes(profesorId?: number, soloAdmin = false) {
-  const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+const INITIAL_SOLICITUDES: Solicitud[] = []
+
+export function useSolicitudes(_profesorId?: number, _soloAdmin = false) {
+  const [solicitudes, setSolicitudes] = useState<Solicitud[]>(() => {
+    const local = sessionStorage.getItem('mock_solicitudes')
+    return local ? JSON.parse(local) : INITIAL_SOLICITUDES
+  })
+  const [loading] = useState(false)
+  const [error] = useState<string | null>(null)
 
   const fetchSolicitudes = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    // No-op en modo mock
+  }, [])
 
-    let query = supabase
-      .from('solicitudes_salon')
-      .select(`
-        *,
-        salon:salones(nombre),
-        profesor:usuarios!profesor_id(nombre, correo)
-      `)
-      .order('created_at', { ascending: false })
-
-    if (profesorId && !soloAdmin) query = query.eq('profesor_id', profesorId)
-
-    const { data, error: err } = await query
-
-    if (err) {
-      setError(err.message)
-    } else {
-      setSolicitudes((data as Solicitud[]) ?? [])
-    }
-    setLoading(false)
-  }, [profesorId, soloAdmin])
-
-  useEffect(() => {
-    fetchSolicitudes()
-
-    const channel = supabase
-      .channel('solicitudes_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_salon' }, () => {
-        fetchSolicitudes()
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [fetchSolicitudes])
-
-  const crearSolicitud = async (datos: NuevaSolicitud, profesor: { id: number; nombre: string }) => {
-    const { error: err } = await supabase.from('solicitudes_salon').insert([{
-      ...datos,
+  const crearSolicitud = async (datos: NuevaSolicitud, profesor: { id: number; nombre: string; correo?: string }) => {
+    const nueva: Solicitud = {
+      id: `sol-${Date.now()}`,
       profesor_id: profesor.id,
+      salon_id: datos.salon_id,
+      fecha: datos.fecha,
+      hora_inicio: datos.hora_inicio,
+      hora_fin: datos.hora_fin,
+      motivo: datos.motivo,
       estado: 'PENDIENTE',
-    }])
-    if (err) throw err
-
-    await notificarAdmins(
-      'Nueva solicitud de salón',
-      `El profesor ${profesor.nombre} solicitó un salón para el ${datos.fecha} de ${datos.hora_inicio} a ${datos.hora_fin}.`,
-      'info'
-    )
-
-    await fetchSolicitudes()
+      admin_id: null,
+      respuesta: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      salon: { nombre: `Salón ${datos.salon_id}` },
+      profesor: { nombre: profesor.nombre, correo: profesor.correo || 'profesor@uteq.edu.mx' }
+    }
+    const updated = [nueva, ...solicitudes]
+    setSolicitudes(updated)
+    sessionStorage.setItem('mock_solicitudes', JSON.stringify(updated))
   }
 
   const responderSolicitud = async (
@@ -98,40 +71,37 @@ export function useSolicitudes(profesorId?: number, soloAdmin = false) {
     adminId: number,
     estado: 'APROBADA' | 'RECHAZADA',
     respuesta: string,
-    solicitud: Solicitud
+    _solicitud: Solicitud
   ) => {
-    const { error: err } = await supabase
-      .from('solicitudes_salon')
-      .update({ estado, admin_id: adminId, respuesta })
-      .eq('id', id)
-    if (err) throw err
-
-    // Notificar al profesor
-    const { data: adminData } = await supabase
-      .from('usuarios')
-      .select('nombre')
-      .eq('id', adminId)
-      .single()
-
-    const { error: notifErr } = await supabase.from('notificaciones').insert([{
-      usuario_id: solicitud.profesor_id,
-      titulo: estado === 'APROBADA' ? 'Solicitud Aprobada ✅' : 'Solicitud Rechazada ❌',
-      mensaje: `Tu solicitud de salón para el ${solicitud.fecha} fue ${estado === 'APROBADA' ? 'aprobada' : 'rechazada'} por ${adminData?.nombre ?? 'el administrador'}. ${respuesta ? `Motivo: ${respuesta}` : ''}`,
-      tipo: estado === 'APROBADA' ? 'info' : 'alerta',
-    }])
-
-    if (notifErr) console.error('Error al notificar al profesor:', notifErr)
-
-    await fetchSolicitudes()
+    const updated = solicitudes.map(s => {
+      if (s.id === id) {
+        return {
+          ...s,
+          estado,
+          admin_id: adminId,
+          respuesta,
+          updated_at: new Date().toISOString()
+        }
+      }
+      return s
+    })
+    setSolicitudes(updated)
+    sessionStorage.setItem('mock_solicitudes', JSON.stringify(updated))
   }
 
   const cancelarSolicitud = async (id: string) => {
-    const { error: err } = await supabase
-      .from('solicitudes_salon')
-      .update({ estado: 'CANCELADA' })
-      .eq('id', id)
-    if (err) throw err
-    await fetchSolicitudes()
+    const updated = solicitudes.map(s => {
+      if (s.id === id) {
+        return {
+          ...s,
+          estado: 'CANCELADA' as const,
+          updated_at: new Date().toISOString()
+        }
+      }
+      return s
+    })
+    setSolicitudes(updated)
+    sessionStorage.setItem('mock_solicitudes', JSON.stringify(updated))
   }
 
   return {

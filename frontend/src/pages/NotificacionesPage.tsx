@@ -34,43 +34,27 @@ export default function NotificacionesPage() {
   const { notificaciones, noLeidas, marcarComoLeidas } = useNotificaciones(usuario?.id)
 
   return (
-    <div className="dash-root">
-      <div className="dash-glow dash-glow-1" />
-      <div className="dash-glow dash-glow-2" />
-
-      <header className="dash-header">
-        <div className="dash-brand">
-          <div className="dash-brand-bar" />
-          <h1 className="dash-brand-title" style={{ fontSize: '18px' }}>Control de Acceso</h1>
+    <div>
+      {/* Encabezado de sección */}
+      <div className="dash-welcome" style={{ marginBottom: '28px' }}>
+        <div className="dash-welcome-icon">
+          <span className="material-symbols-outlined">notifications</span>
         </div>
-        <div className="dash-header-actions">
-          {noLeidas > 0 && (
-            <button className="dash-logout-btn"
-              style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-              onClick={marcarComoLeidas}>
-              <span className="material-symbols-outlined">done_all</span>
-              Marcar todas como leídas
-            </button>
-          )}
-          <button className="dash-logout-btn" onClick={() => navigate(esAdmin ? '/admin' : '/dashboard')}
-            style={{ marginLeft: '8px' }}>
-            <span className="material-symbols-outlined">arrow_back</span> Volver
+        <div style={{ flex: 1 }}>
+          <h2 className="dash-welcome-title">Notificaciones</h2>
+          <p className="dash-welcome-sub">
+            {noLeidas > 0 ? `Tienes ${noLeidas} notificación${noLeidas > 1 ? 'es' : ''} sin leer.` : 'Todo al día.'}
+          </p>
+        </div>
+        {noLeidas > 0 && (
+          <button className="dash-logout-btn"
+            style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)', flexShrink: 0 }}
+            onClick={marcarComoLeidas}>
+            <span className="material-symbols-outlined">done_all</span>
+            Marcar leídas
           </button>
-        </div>
-      </header>
-
-      <main className="dash-main">
-        <div className="dash-welcome">
-          <div className="dash-welcome-icon">
-            <span className="material-symbols-outlined">notifications</span>
-          </div>
-          <div>
-            <h2 className="dash-welcome-title">Notificaciones</h2>
-            <p className="dash-welcome-sub">
-              {noLeidas > 0 ? `Tienes ${noLeidas} notificación${noLeidas > 1 ? 'es' : ''} sin leer.` : 'Todo al día.'}
-            </p>
-          </div>
-        </div>
+        )}
+      </div>
 
         {notificaciones.length === 0 ? (
           <div className="dash-card" style={{ textAlign: 'center', padding: '60px' }}>
@@ -122,11 +106,6 @@ export default function NotificacionesPage() {
             ))}
           </div>
         )}
-      </main>
-
-      <footer className="dash-footer">
-        <p>© 2026 IDGS15 Equipo 6. TODOS LOS DERECHOS RESERVADOS.</p>
-      </footer>
-    </div>
+      </div>
   )
 }

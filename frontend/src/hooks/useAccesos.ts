@@ -1,8 +1,7 @@
 // src/hooks/useAccesos.ts
-// Hook para cargar y crear registros de acceso desde Supabase
+// Frontend Mock Mode
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../supabaseClient'
+import { useState, useCallback } from 'react'
 
 export interface Acceso {
   id: string
@@ -14,7 +13,6 @@ export interface Acceso {
   autorizado: boolean
   motivo_denegacion: string | null
   created_at: string
-  // Joined
   salon?: { nombre: string }
   profesor?: { nombre: string; correo: string }
 }
@@ -26,53 +24,20 @@ export interface ResultadoValidacion {
   materia: string | null
 }
 
-export function useAccesos(profesorId?: number, salonId?: string) {
-  const [accesos, setAccesos] = useState<Acceso[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+const INITIAL_ACCESOS: Acceso[] = []
+
+export function useAccesos(_profesorId?: number, _salonId?: string) {
+  const [accesos, setAccesos] = useState<Acceso[]>(() => {
+    const local = sessionStorage.getItem('mock_accesos')
+    return local ? JSON.parse(local) : INITIAL_ACCESOS
+  })
+  const [loading] = useState(false)
+  const [error] = useState<string | null>(null)
 
   const fetchAccesos = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    // No-op en modo mock
+  }, [])
 
-    let query = supabase
-      .from('accesos')
-      .select(`
-        *,
-        salon:salones(nombre),
-        profesor:usuarios(nombre, correo)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(100)
-
-    if (profesorId) query = query.eq('profesor_id', profesorId)
-    if (salonId)    query = query.eq('salon_id', salonId)
-
-    const { data, error: err } = await query
-
-    if (err) {
-      setError(err.message)
-    } else {
-      setAccesos((data as Acceso[]) ?? [])
-    }
-    setLoading(false)
-  }, [profesorId, salonId])
-
-  useEffect(() => {
-    fetchAccesos()
-
-    // Tiempo real
-    const channel = supabase
-      .channel('accesos_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'accesos' }, () => {
-        fetchAccesos()
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [fetchAccesos])
-
-  // Registrar un nuevo acceso en la BD
   const registrarAcceso = async (params: {
     salon_id: string
     profesor_id: number
@@ -82,30 +47,29 @@ export function useAccesos(profesorId?: number, salonId?: string) {
     qr_data?: string
     motivo_denegacion?: string
   }) => {
-    const { error: err } = await supabase.from('accesos').insert([params])
-    if (err) throw err
-    await fetchAccesos()
+    const nuevo: Acceso = {
+      id: `acc-${Date.now()}`,
+      salon_id: params.salon_id,
+      profesor_id: params.profesor_id,
+      tipo: params.tipo,
+      metodo: params.metodo,
+      qr_data: params.qr_data || null,
+      autorizado: params.autorizado,
+      motivo_denegacion: params.motivo_denegacion || null,
+      created_at: new Date().toISOString(),
+      salon: { nombre: `Salón ${params.salon_id}` },
+      profesor: { nombre: 'Profesor Local', correo: 'profesor@uteq.edu.mx' }
+    }
+    const updated = [nuevo, ...accesos]
+    setAccesos(updated)
+    sessionStorage.setItem('mock_accesos', JSON.stringify(updated))
   }
 
-  // Llamar la función SQL que valida horario vs hora actual
   const validarAccesoQR = async (
-    profesorId: number,
-    salonId: string
+    _profesorId: number,
+    _salonId: string
   ): Promise<ResultadoValidacion> => {
-    const { data, error: err } = await supabase.rpc('validar_acceso_qr', {
-      p_profesor_id: profesorId,
-      p_salon_id: salonId,
-    })
-
-    if (err) throw err
-
-    const resultado = data?.[0]
-    return {
-      autorizado:  resultado?.autorizado  ?? false,
-      motivo:      resultado?.motivo      ?? 'Error al validar',
-      horario_id:  resultado?.horario_id  ?? null,
-      materia:     resultado?.materia     ?? null,
-    }
+    return { autorizado: true, motivo: 'Acceso autorizado (modo mock)', horario_id: 'hor-1', materia: 'Desarrollo Móvil' }
   }
 
   return { accesos, loading, error, fetchAccesos, registrarAcceso, validarAccesoQR }

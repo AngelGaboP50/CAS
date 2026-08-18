@@ -1,5 +1,6 @@
 // src/pages/SolicitudesPage.tsx
 // Profesores: ven sus solicitudes. Admins: ven todas y pueden aprobar/rechazar.
+// El layout (sidebar, topbar) lo provee AppShell.
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -35,6 +36,13 @@ export default function SolicitudesPage() {
   const [procesando, setProcesando] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
+  const inputStyle: React.CSSProperties = {
+    padding: '10px 14px', borderRadius: '8px',
+    background: 'var(--color-bg)', border: '1px solid var(--color-outline-variant)',
+    color: 'var(--color-on-surface)', outline: 'none',
+    fontFamily: 'inherit', fontSize: '14px', width: '100%', boxSizing: 'border-box'
+  }
+
   const confirmarRespuesta = async () => {
     if (!modalRespuesta || !accionPendiente || !usuario) return
     const solicitud = solicitudes.find(s => s.id === modalRespuesta)
@@ -54,143 +62,118 @@ export default function SolicitudesPage() {
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    padding: '10px 14px', borderRadius: '8px',
-    background: 'var(--color-bg)', border: '1px solid var(--color-outline-variant)',
-    color: 'var(--color-on-surface)', outline: 'none',
-    fontFamily: 'inherit', fontSize: '14px', width: '100%', boxSizing: 'border-box'
-  }
-
   return (
-    <div className="dash-root">
-      <div className="dash-glow dash-glow-1" />
-      <div className="dash-glow dash-glow-2" />
-
-      <header className="dash-header">
-        <div className="dash-brand">
-          <div className="dash-brand-bar" />
-          <h1 className="dash-brand-title" style={{ fontSize: '18px' }}>Control de Acceso</h1>
+    <>
+      {/* Encabezado de sección */}
+      <div className="dash-welcome" style={{ marginBottom: '28px' }}>
+        <div className="dash-welcome-icon">
+          <span className="material-symbols-outlined">pending_actions</span>
         </div>
-        <div className="dash-header-actions">
-          <button className="dash-logout-btn" onClick={() => navigate(esAdmin ? '/admin' : '/dashboard')}>
-            <span className="material-symbols-outlined">arrow_back</span> Volver
-          </button>
+        <div>
+          <h2 className="dash-welcome-title">
+            {esAdmin ? 'Gestión de Solicitudes' : 'Mis Solicitudes'}
+          </h2>
+          <p className="dash-welcome-sub">
+            {esAdmin
+              ? 'Aprueba o rechaza solicitudes de uso temporal de salones.'
+              : 'Estado de tus solicitudes de salones enviadas al administrador.'}
+          </p>
         </div>
-      </header>
+      </div>
 
-      <main className="dash-main">
-        <div className="dash-welcome">
-          <div className="dash-welcome-icon">
-            <span className="material-symbols-outlined">pending_actions</span>
-          </div>
-          <div>
-            <h2 className="dash-welcome-title">
-              {esAdmin ? 'Gestión de Solicitudes' : 'Mis Solicitudes'}
-            </h2>
-            <p className="dash-welcome-sub">
-              {esAdmin
-                ? 'Aprueba o rechaza solicitudes de uso temporal de salones.'
-                : 'Estado de tus solicitudes de salones enviadas al administrador.'}
-            </p>
-          </div>
+      {/* Contenido */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--color-on-surface-variant)' }}>
+          <div className="hor-spinner" style={{ margin: '0 auto 16px' }} />
+          <p>Cargando solicitudes...</p>
         </div>
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: 'var(--color-on-surface-variant)' }}>
-            <div className="hor-spinner" style={{ margin: '0 auto 16px' }} />
-            <p>Cargando solicitudes...</p>
-          </div>
-        ) : solicitudes.length === 0 ? (
-          <div className="dash-card" style={{ textAlign: 'center', padding: '60px' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-on-surface-variant)', marginBottom: '16px', display: 'block' }}>inbox</span>
-            <p style={{ color: 'var(--color-on-surface-variant)' }}>No hay solicitudes registradas.</p>
-            {!esAdmin && (
-              <button className="dash-logout-btn" style={{ margin: '20px auto 0', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
-                onClick={() => navigate('/salones')}>
-                <span className="material-symbols-outlined">add</span> Solicitar un salón
-              </button>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {solicitudes.map(sol => (
-              <div className="dash-card" key={sol.id} style={{ padding: '20px 24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
-                      <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '22px' }}>meeting_room</span>
-                      <span style={{ fontWeight: 600, fontSize: '16px' }}>
-                        {sol.salon?.nombre ?? sol.salon_id}
-                      </span>
-                      {esAdmin && (
-                        <span style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
-                          — {sol.profesor?.nombre}
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
-                      <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>calendar_today</span> {formatFecha(sol.fecha)}</span>
-                      <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>schedule</span> {sol.hora_inicio} – {sol.hora_fin}</span>
-                      <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>send</span> Enviada {formatFecha(sol.created_at)}</span>
-                    </div>
-
-                    <p style={{ marginTop: '10px', fontSize: '14px', color: 'var(--color-on-surface)' }}>
-                      <strong>Motivo:</strong> {sol.motivo}
-                    </p>
-
-                    {sol.respuesta && (
-                      <p style={{ marginTop: '6px', fontSize: '13px', color: 'var(--color-on-surface-variant)', fontStyle: 'italic' }}>
-                        <strong>Respuesta admin:</strong> {sol.respuesta}
-                      </p>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
-                    <span style={{
-                      padding: '5px 14px', borderRadius: '14px', fontSize: '12px', fontWeight: 600,
-                      background: `${ESTADO_COLOR[sol.estado]}22`,
-                      color: ESTADO_COLOR[sol.estado],
-                      border: `1px solid ${ESTADO_COLOR[sol.estado]}55`,
-                    }}>
-                      {sol.estado}
+      ) : solicitudes.length === 0 ? (
+        <div className="dash-card" style={{ textAlign: 'center', padding: '60px' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-on-surface-variant)', marginBottom: '16px', display: 'block' }}>inbox</span>
+          <p style={{ color: 'var(--color-on-surface-variant)' }}>No hay solicitudes registradas.</p>
+          {!esAdmin && (
+            <button className="dash-logout-btn"
+              style={{ margin: '20px auto 0', borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+              onClick={() => navigate('/salones')}>
+              <span className="material-symbols-outlined">add</span> Solicitar un salón
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {solicitudes.map(sol => (
+            <div className="dash-card" key={sol.id} style={{ padding: '20px 24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                    <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '22px' }}>meeting_room</span>
+                    <span style={{ fontWeight: 600, fontSize: '16px' }}>
+                      {sol.salon?.nombre ?? sol.salon_id}
                     </span>
-
-                    {/* Acciones para admins */}
-                    {esAdmin && sol.estado === 'PENDIENTE' && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="dash-logout-btn"
-                          style={{ borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)', fontSize: '13px', padding: '6px 14px' }}
-                          onClick={() => { setModalRespuesta(sol.id); setAccionPendiente('APROBADA'); setRespuesta('') }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span> Aprobar
-                        </button>
-                        <button className="dash-logout-btn"
-                          style={{ borderColor: '#ff6b7a', color: '#ff6b7a', fontSize: '13px', padding: '6px 14px' }}
-                          onClick={() => { setModalRespuesta(sol.id); setAccionPendiente('RECHAZADA'); setRespuesta('') }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>cancel</span> Rechazar
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Cancelar para profesor */}
-                    {!esAdmin && sol.estado === 'PENDIENTE' && (
-                      <button className="dash-logout-btn"
-                        style={{ borderColor: 'var(--color-outline-variant)', fontSize: '13px' }}
-                        onClick={() => cancelarSolicitud(sol.id)}>
-                        Cancelar solicitud
-                      </button>
+                    {esAdmin && (
+                      <span style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
+                        — {sol.profesor?.nombre}
+                      </span>
                     )}
                   </div>
+
+                  <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
+                    <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>calendar_today</span> {formatFecha(sol.fecha)}</span>
+                    <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>schedule</span> {sol.hora_inicio} – {sol.hora_fin}</span>
+                    <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>send</span> Enviada {formatFecha(sol.created_at)}</span>
+                  </div>
+
+                  <p style={{ marginTop: '10px', fontSize: '14px', color: 'var(--color-on-surface)' }}>
+                    <strong>Motivo:</strong> {sol.motivo}
+                  </p>
+
+                  {sol.respuesta && (
+                    <p style={{ marginTop: '6px', fontSize: '13px', color: 'var(--color-on-surface-variant)', fontStyle: 'italic' }}>
+                      <strong>Respuesta admin:</strong> {sol.respuesta}
+                    </p>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+                  <span style={{
+                    padding: '5px 14px', borderRadius: '14px', fontSize: '12px', fontWeight: 600,
+                    background: `${ESTADO_COLOR[sol.estado]}22`,
+                    color: ESTADO_COLOR[sol.estado],
+                    border: `1px solid ${ESTADO_COLOR[sol.estado]}55`,
+                  }}>
+                    {sol.estado}
+                  </span>
+
+                  {/* Acciones para admins */}
+                  {esAdmin && sol.estado === 'PENDIENTE' && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="dash-logout-btn"
+                        style={{ borderColor: 'var(--color-secondary)', color: 'var(--color-secondary)', fontSize: '13px', padding: '6px 14px' }}
+                        onClick={() => { setModalRespuesta(sol.id); setAccionPendiente('APROBADA'); setRespuesta('') }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check_circle</span> Aprobar
+                      </button>
+                      <button className="dash-logout-btn"
+                        style={{ borderColor: '#ff6b7a', color: '#ff6b7a', fontSize: '13px', padding: '6px 14px' }}
+                        onClick={() => { setModalRespuesta(sol.id); setAccionPendiente('RECHAZADA'); setRespuesta('') }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>cancel</span> Rechazar
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Cancelar para profesor */}
+                  {!esAdmin && sol.estado === 'PENDIENTE' && (
+                    <button className="dash-logout-btn"
+                      style={{ borderColor: 'var(--color-outline-variant)', fontSize: '13px' }}
+                      onClick={() => cancelarSolicitud(sol.id)}>
+                      Cancelar solicitud
+                    </button>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </main>
-
-      <footer className="dash-footer">
-        <p>© 2026 IDGS15 Equipo 6. TODOS LOS DERECHOS RESERVADOS.</p>
-      </footer>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal de respuesta admin */}
       {modalRespuesta && accionPendiente && (
@@ -217,7 +200,7 @@ export default function SolicitudesPage() {
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '20px 28px' }}>
               <label style={{ fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>
                 Mensaje para el profesor (opcional)
               </label>
@@ -246,6 +229,6 @@ export default function SolicitudesPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

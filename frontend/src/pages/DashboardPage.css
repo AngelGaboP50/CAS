@@ -891,3 +891,104 @@
 .map-card--span2 {
   grid-column: span 2;
 }
+
+/* ─── Horario Status Badges ──────────────────────────────────── */
+.hor-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.hor-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 20px;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+}
+
+.hor-status-badge--pending {
+  background: rgba(251, 211, 141, .15);
+  color: #fbd38d;
+  border: 1px solid rgba(251, 211, 141, .35);
+  animation: pendingPulse 2s ease-in-out infinite;
+}
+
+.hor-status-badge--authorized {
+  background: rgba(74, 225, 131, .15);
+  color: #4ae183;
+  border: 1px solid rgba(74, 225, 131, .35);
+}
+
+.hor-status-badge--rejected {
+  background: rgba(255, 107, 122, .12);
+  color: #ff6b7a;
+  border: 1px solid rgba(255, 107, 122, .35);
+}
+
+.hor-status-badge .material-symbols-outlined {
+  font-size: 15px;
+}
+
+@keyframes pendingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ─── Pending / Rejected Notice Banners ─────────────────────── */
+.hor-pending-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(251, 211, 141, .07);
+  border: 1px solid rgba(251, 211, 141, .25);
+  color: #fbd38d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hor-pending-notice .material-symbols-outlined {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hor-rejected-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(255, 107, 122, .07);
+  border: 1px solid rgba(255, 107, 122, .25);
+  color: #ff6b7a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hor-rejected-notice .material-symbols-outlined {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ─── Card Tag Variants ───────────────────────────────────────── */
+.dash-card-tag--pending {
+  background: rgba(251, 211, 141, .12);
+  color: #fbd38d;
+  border-color: rgba(251, 211, 141, .3);
+  animation: pendingPulse 2s ease-in-out infinite;
+}
+
+.dash-card-tag--rejected {
+  background: rgba(255, 107, 122, .12);
+  color: #ff6b7a;
+  border-color: rgba(255, 107, 122, .3);
+}
