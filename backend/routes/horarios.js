@@ -4,6 +4,7 @@ const path    = require('path')
 const fs      = require('fs')
 const pool    = require('../db')
 const jwt     = require('jsonwebtoken')
+const { uploadToHostingerFTP } = require('../utils/ftpUploader')
 
 const router = express.Router()
 
@@ -102,7 +103,9 @@ router.post('/upload', upload.single('imagen'), async (req, res) => {
       return res.status(400).json({ error: 'ID de profesor no proporcionado' })
     }
 
-    const imagenUrl = `/uploads/horarios/${req.file.filename}`
+    const localFilePath = path.join(uploadDir, req.file.filename)
+    // Sube a Hostinger FTP y obtiene la URL pública https://devnationqro.com/Imagenes_horarios/...
+    const imagenUrl = await uploadToHostingerFTP(localFilePath, req.file.filename)
 
     // Desactivar horarios anteriores del profesor
     await pool.query(
@@ -149,7 +152,9 @@ router.post('/admin-asignar', upload.single('imagen'), async (req, res) => {
       return res.status(400).json({ error: 'Debes seleccionar un profesor' })
     }
 
-    const imagenUrl = `/uploads/horarios/${req.file.filename}`
+    const localFilePath = path.join(uploadDir, req.file.filename)
+    // Sube a Hostinger FTP y obtiene la URL pública
+    const imagenUrl = await uploadToHostingerFTP(localFilePath, req.file.filename)
 
     // Desactivar horarios anteriores del profesor
     await pool.query(
