@@ -15,8 +15,8 @@ function getUsuario() {
     if (!raw) return null
     const user = JSON.parse(raw)
     if (user) {
-      if (user.rol === 1) user.tipo = 'profesor'
-      if (user.rol === 2) user.tipo = 'admin'
+      if (Number(user.rol) === 1) user.tipo = 'profesor'
+      if (Number(user.rol) === 2) user.tipo = 'admin'
       if (user.tipo === 'profesor') user.rol = 1
       if (user.tipo === 'admin') user.rol = 2
     }
@@ -35,8 +35,8 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     return <Navigate to="/login" replace />
   }
 
-  const esAdmin    = usuario.rol === 2
-  const esProfesor = usuario.rol === 1
+  const esAdmin    = Number(usuario.rol) === 2 || usuario.tipo === 'admin'
+  const esProfesor = Number(usuario.rol) === 1 || usuario.tipo === 'profesor'
 
   // Requiere admin y no lo es → dashboard del profesor
   if (requiredRole === 'admin' && !esAdmin) {

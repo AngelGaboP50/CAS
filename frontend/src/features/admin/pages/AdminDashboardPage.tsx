@@ -25,7 +25,7 @@ function AdminDashboardPage() {
     return () => clearInterval(timer)
   }, [])
 
-  const timeStr = currentDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
+  const timeStr = currentDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true })
   const dateStr = currentDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   // Estado para las pestañas (Tabs del Sidebar)

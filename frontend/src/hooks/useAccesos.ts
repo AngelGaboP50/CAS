@@ -1,7 +1,8 @@
 // src/hooks/useAccesos.ts
-// Frontend Mock Mode
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 export interface Acceso {
   id: string
@@ -24,19 +25,45 @@ export interface ResultadoValidacion {
   materia: string | null
 }
 
-const INITIAL_ACCESOS: Acceso[] = []
-
 export function useAccesos(_profesorId?: number, _salonId?: string) {
-  const [accesos, setAccesos] = useState<Acceso[]>(() => {
-    const local = sessionStorage.getItem('mock_accesos')
-    return local ? JSON.parse(local) : INITIAL_ACCESOS
-  })
-  const [loading] = useState(false)
-  const [error] = useState<string | null>(null)
+  const [accesos, setAccesos] = useState<Acceso[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const getToken = () => {
+    try {
+      const u = JSON.parse(sessionStorage.getItem('usuario') || '{}')
+      return u.token
+    } catch {
+      return null
+    }
+  }
 
   const fetchAccesos = useCallback(async () => {
-    // No-op en modo mock
+    setLoading(true)
+    setError(null)
+    try {
+      const token = getToken()
+      if (!token) throw new Error('No autenticado')
+        
+      const res = await fetch(`${API}/api/accesos`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      if (!res.ok) throw new Error('Error al obtener el historial')
+      const data = await res.json()
+      setAccesos(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    fetchAccesos()
+  }, [fetchAccesos])
 
   const registrarAcceso = async (params: {
     salon_id: string
@@ -47,29 +74,31 @@ export function useAccesos(_profesorId?: number, _salonId?: string) {
     qr_data?: string
     motivo_denegacion?: string
   }) => {
-    const nuevo: Acceso = {
-      id: `acc-${Date.now()}`,
-      salon_id: params.salon_id,
-      profesor_id: params.profesor_id,
-      tipo: params.tipo,
-      metodo: params.metodo,
-      qr_data: params.qr_data || null,
-      autorizado: params.autorizado,
-      motivo_denegacion: params.motivo_denegacion || null,
-      created_at: new Date().toISOString(),
-      salon: { nombre: `Salón ${params.salon_id}` },
-      profesor: { nombre: 'Profesor Local', correo: 'profesor@uteq.edu.mx' }
+    try {
+      const token = getToken()
+      const res = await fetch(`${API}/api/accesos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(params)
+      })
+      if (!res.ok) throw new Error('Error al registrar acceso')
+      await fetchAccesos() // Recargar tabla
+    } catch (err: any) {
+      console.error(err)
+      setError(err.message)
     }
-    const updated = [nuevo, ...accesos]
-    setAccesos(updated)
-    sessionStorage.setItem('mock_accesos', JSON.stringify(updated))
   }
 
   const validarAccesoQR = async (
     _profesorId: number,
     _salonId: string
   ): Promise<ResultadoValidacion> => {
-    return { autorizado: true, motivo: 'Acceso autorizado (modo mock)', horario_id: 'hor-1', materia: 'Desarrollo Móvil' }
+    // Por ahora esto es solo un mock para la simulación
+    // En el futuro, llamará a una API que cruce el Horario con el Salón
+    return { autorizado: true, motivo: 'Acceso autorizado', horario_id: 'hor-1', materia: 'Desarrollo Móvil' }
   }
 
   return { accesos, loading, error, fetchAccesos, registrarAcceso, validarAccesoQR }

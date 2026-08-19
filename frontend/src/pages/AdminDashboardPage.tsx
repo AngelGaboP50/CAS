@@ -24,8 +24,8 @@ function getUsuario() {
     if (!raw) return null
     const user = JSON.parse(raw)
     if (user) {
-      if (user.rol === 1) user.tipo = 'profesor'
-      if (user.rol === 2) user.tipo = 'admin'
+      if (Number(user.rol) === 1) user.tipo = 'profesor'
+      if (Number(user.rol) === 2) user.tipo = 'admin'
       if (user.tipo === 'profesor') user.rol = 1
       if (user.tipo === 'admin') user.rol = 2
     }
@@ -47,7 +47,7 @@ export default function AdminDashboardPage() {
   const { noLeidas } = useNotificaciones(usuario?.id)
   const [currentDate, setCurrentDate] = useState(new Date())
   useEffect(() => { const t = setInterval(() => setCurrentDate(new Date()), 1000); return () => clearInterval(t) }, [])
-  const timeStr = currentDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
+  const timeStr = currentDate.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true })
   const dateStr = currentDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
   const [activeTab, setActiveTab] = useState<Tab>(location.state?.tab || 'principal')
@@ -244,7 +244,7 @@ export default function AdminDashboardPage() {
     setFormName(u.nombre); 
     setFormEmail(u.correo); 
     // Mapear rol numérico a texto si es necesario
-    const tipo = u.rol === 2 || u.tipo === 'admin' ? 'admin' : 'profesor';
+    const tipo = Number(u.rol) === 2 || u.tipo === 'admin' ? 'admin' : 'profesor';
     setFormType(tipo); 
     setFormPassword('') 
   }
@@ -324,7 +324,7 @@ export default function AdminDashboardPage() {
     if (window.confirm('¿Estás seguro de que deseas reactivar este usuario?')) {
       const token = sessionStorage.getItem('token')
       const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
-      const rolNum = usuarioObj.rol === 2 || usuarioObj.tipo === 'admin' ? 2 : 1
+      const rolNum = Number(usuarioObj.rol) === 2 || usuarioObj.tipo === 'admin' ? 2 : 1
       try {
         const res = await fetch(`${API}/api/usuarios/${usuarioObj.id}`, {
           method: 'PUT',
@@ -680,8 +680,8 @@ export default function AdminDashboardPage() {
                                 <td style={{ padding: '16px 12px' }}>{u.nombre}</td>
                                 <td style={{ padding: '16px 12px', color: 'var(--color-on-surface-variant)' }}>{u.correo}</td>
                                 <td style={{ padding: '16px 12px' }}>
-                                  <span className="dash-badge" style={{ background: (u.rol === 2 || u.tipo === 'admin') ? ADMIN_BG : 'rgba(146,204,255,.1)', color: (u.rol === 2 || u.tipo === 'admin') ? ADMIN_COLOR : 'var(--color-primary)', border: `1px solid ${(u.rol === 2 || u.tipo === 'admin') ? ADMIN_COLOR : 'rgba(146,204,255,.3)'}` }}>
-                                    {(u.rol === 2 || u.tipo === 'admin' ? 'admin' : 'profesor').toUpperCase()}
+                                  <span className="dash-badge" style={{ background: (Number(u.rol) === 2 || u.tipo === 'admin') ? ADMIN_BG : 'rgba(146,204,255,.1)', color: (Number(u.rol) === 2 || u.tipo === 'admin') ? ADMIN_COLOR : 'var(--color-primary)', border: `1px solid ${(Number(u.rol) === 2 || u.tipo === 'admin') ? ADMIN_COLOR : 'rgba(146,204,255,.3)'}` }}>
+                                    {(Number(u.rol) === 2 || u.tipo === 'admin' ? 'admin' : 'profesor').toUpperCase()}
                                   </span>
                                 </td>
                                 <td style={{ padding: '16px 12px' }}>
@@ -911,7 +911,7 @@ export default function AdminDashboardPage() {
                   style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
                 >
                   <option value="">-- Selecciona un profesor --</option>
-                  {usuarios.filter(u => u.rol === 1 || u.tipo === 'profesor').map(u => (
+                  {usuarios.filter(u => Number(u.rol) === 1 || u.tipo === 'profesor').map(u => (
                     <option key={u.id} value={u.id}>
                       {u.nombre} ({u.correo})
                     </option>

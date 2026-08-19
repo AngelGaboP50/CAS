@@ -20,8 +20,8 @@ function getUsuario() {
     const raw = sessionStorage.getItem('usuario')
     if (!raw) return null
     const user = JSON.parse(raw)
-    if (user.rol === 1) user.tipo = 'profesor'
-    if (user.rol === 2) user.tipo = 'admin'
+    if (Number(user.rol) === 1) user.tipo = 'profesor'
+    if (Number(user.rol) === 2) user.tipo = 'admin'
     return user
   } catch { return null }
 }
@@ -43,7 +43,7 @@ export default function AppShell() {
   }, [])
 
   const timeStr = currentDate.toLocaleTimeString('es-MX', {
-    hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+    hour: 'numeric', minute: '2-digit', hour12: true,
   })
   const dateStr = currentDate.toLocaleDateString('es-MX', {
     weekday: 'long', day: 'numeric', month: 'long',

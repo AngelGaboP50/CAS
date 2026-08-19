@@ -105,6 +105,114 @@ router.post('/verify-email', async (req, res) => {
   }
 })
 
+// ─── VERIFICAR EMAIL (CON LINK DIRECTO) ───────────────────────────────────
+// GET /api/auth/verify-link
+router.get('/verify-link', async (req, res) => {
+  const { correo, code } = req.query
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+  if (!correo || !code) {
+    return res.redirect(`${frontendUrl}/login?error=Datos invalidos`)
+  }
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, verification_code, is_verified FROM usuarios WHERE correo = ?',
+      [correo]
+    )
+
+    if (rows.length === 0) {
+      return res.redirect(`${frontendUrl}/login?error=Usuario no encontrado`)
+    }
+
+    const usuario = rows[0]
+
+    if (usuario.is_verified === 1) {
+      return res.redirect(`${frontendUrl}/login?verified=already`)
+    }
+
+    if (usuario.verification_code !== code) {
+      return res.redirect(`${frontendUrl}/login?error=Codigo incorrecto`)
+    }
+
+    await pool.query(
+      'UPDATE usuarios SET is_verified = 1, verification_code = NULL WHERE id = ?',
+      [usuario.id]
+    )
+
+    return res.redirect(`${frontendUrl}/login?verified=success`)
+  } catch (err) {
+    console.error('Error en /verify-link:', err)
+    return res.redirect(`${frontendUrl}/login?error=Error del servidor`)
+  }
+})
+
+// ─── REENVIAR CORREO DE VERIFICACIÓN ───────────────────────────────────────
+// POST /api/auth/resend-verification
+router.post('/resend-verification', async (req, res) => {
+  const { correo } = req.body
+
+  if (!correo) {
+    return res.status(400).json({ error: 'El correo es requerido' })
+  }
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, nombre, is_verified FROM usuarios WHERE correo = ?',
+      [correo]
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' })
+    }
+
+    const usuario = rows[0]
+
+    if (usuario.is_verified === 1) {
+      return res.status(400).json({ error: 'La cuenta ya está verificada' })
+    }
+
+    const verificationCode = generateOTP()
+
+    await pool.query(
+      'UPDATE usuarios SET verification_code = ? WHERE id = ?',
+      [verificationCode, usuario.id]
+    )
+
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001'
+    const verifyLink = `${backendUrl}/api/auth/verify-link?correo=${encodeURIComponent(correo)}&code=${verificationCode}`
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="https://devnationqro.com/Logo/CAS.jpeg" alt="CAS Logo" style="max-width: 150px; height: auto;" />
+        </div>
+        <h2 style="color: #2b5c8f; text-align: center;">Verifica tu correo electrónico</h2>
+        <p>Hola <strong>${usuario.nombre}</strong>,</p>
+        <p>Has solicitado reenviar tu código de verificación para CAS.</p>
+        
+        <p>Puedes verificar tu cuenta instantáneamente haciendo clic en el siguiente botón:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${verifyLink}" style="background-color: #4a90e2; color: white; text-decoration: none; padding: 12px 25px; border-radius: 5px; font-weight: bold; display: inline-block;">Verificar mi cuenta</a>
+        </div>
+
+        <p>O si prefieres, ingresa este código de 6 dígitos en la aplicación:</p>
+        <div style="background-color: #f4f4f4; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 5px; margin: 20px 0;">
+          ${verificationCode}
+        </div>
+        
+        <p style="color: #888; font-size: 12px; text-align: center; margin-top: 30px;">© ${new Date().getFullYear()} CAS Equipo 6</p>
+      </div>
+    `
+    await sendEmail(correo, 'Verificación de cuenta CAS', html)
+
+    return res.status(200).json({ message: 'Correo reenviado exitosamente.' })
+  } catch (err) {
+    console.error('Error en /resend-verification:', err)
+    return res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
