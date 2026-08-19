@@ -32,8 +32,12 @@ export default function SalonesPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const usuario = getUsuario()
-  const { aulas, loading } = useAulas()
+  const { aulas, loading, fetchAulas } = useAulas()
   const { crearSolicitud } = useSolicitudes(usuario?.id)
+
+  useEffect(() => {
+    fetchAulas()
+  }, [fetchAulas])
 
   const [filtro, setFiltro] = useState<EstadoAula | 'TODOS'>('TODOS')
   const [modalSolicitud, setModalSolicitud] = useState<{ salonId: string; nombre: string } | null>(null)
