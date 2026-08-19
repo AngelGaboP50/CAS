@@ -38,8 +38,11 @@ function ResetPasswordPage() {
       setError('Las contraseñas no coinciden')
       return
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres')
+    
+    // Validar seguridad de la contraseña
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+    if (!passwordRegex.test(password)) {
+      setError('La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un símbolo especial (@$!%*?&)')
       return
     }
 
@@ -188,7 +191,27 @@ function ResetPasswordPage() {
                   </div>
                 </div>
 
-                <button type="submit" className="btn-submit" disabled={loading || !token}>
+                {/* Indicador de seguridad de contraseña */}
+                <div style={{ marginTop: '-10px', marginBottom: '20px', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ color: password.length >= 8 ? '#5ddf9a' : 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{password.length >= 8 ? 'check_circle' : 'radio_button_unchecked'}</span>
+                    Mínimo 8 caracteres
+                  </div>
+                  <div style={{ color: /[A-Z]/.test(password) ? '#5ddf9a' : 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{/[A-Z]/.test(password) ? 'check_circle' : 'radio_button_unchecked'}</span>
+                    Al menos una mayúscula
+                  </div>
+                  <div style={{ color: /\d/.test(password) ? '#5ddf9a' : 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{/\d/.test(password) ? 'check_circle' : 'radio_button_unchecked'}</span>
+                    Al menos un número
+                  </div>
+                  <div style={{ color: /[@$!%*?&]/.test(password) ? '#5ddf9a' : 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>{/[@$!%*?&]/.test(password) ? 'check_circle' : 'radio_button_unchecked'}</span>
+                    Al menos un símbolo especial (@$!%*?&)
+                  </div>
+                </div>
+
+                <button type="submit" className="btn-submit" id="btn-reset" disabled={loading || !token}>
                   {loading ? 'Guardando...' : 'Guardar Nueva Contraseña'}
                   {!loading && <span className="material-symbols-outlined icon-sm">save</span>}
                 </button>

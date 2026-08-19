@@ -18,8 +18,10 @@ router.post('/register', async (req, res) => {
   if (!nombre || !correo || !password) {
     return res.status(400).json({ error: 'Todos los campos son requeridos' })
   }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' })
+
+  const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+  if (!passwordRegex.test(password)) {
+    return res.status(400).json({ error: 'La contraseña no cumple con los requisitos mínimos de seguridad' })
   }
 
   try {
@@ -224,8 +226,10 @@ router.post('/reset-password', async (req, res) => {
   if (!token || !newPassword) {
     return res.status(400).json({ error: 'Token y nueva contraseña son requeridos' })
   }
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' })
+  
+  const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+  if (!passwordRegex.test(newPassword)) {
+    return res.status(400).json({ error: 'La contraseña no cumple con los requisitos mínimos de seguridad' })
   }
 
   try {
