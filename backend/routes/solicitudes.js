@@ -60,18 +60,28 @@ router.get('/:id/estado', auth, async (req, res) => {
 // Crear solicitud (Profesor)
 router.post('/', auth, async (req, res) => {
   const { salon_id, motivo } = req.body;
-  if (!salon_id) return res.status(400).json({ error: 'Falta el campo salon_id' });
   if (!req.user?.id) return res.status(401).json({ error: 'Token inválido o sin usuario' });
 
+  // Validar y convertir salon_id a entero seguro
+  const salonIdInt = parseInt(salon_id, 10);
+  if (!salon_id || isNaN(salonIdInt) || salonIdInt <= 0) {
+    return res.status(400).json({ error: `salon_id inválido: "${salon_id}". Debe ser un número entero positivo.` });
+  }
+
   try {
+    // Verificar que el salón exista antes de insertar
+    const [salones] = await pool.query('SELECT id FROM salones WHERE id = ?', [salonIdInt]);
+    if (salones.length === 0) {
+      return res.status(400).json({ error: `El salón con id=${salonIdInt} no existe en la base de datos.` });
+    }
+
     const [result] = await pool.query(
       "INSERT INTO solicitudes (salon_id, profesor_id, motivo, estado) VALUES (?, ?, ?, 'PENDIENTE')",
-      [Number(salon_id), req.user.id, motivo || 'Fuera de horario']
+      [salonIdInt, req.user.id, motivo || 'Fuera de horario']
     );
     res.status(201).json({ id: result.insertId, message: 'Solicitud creada' });
   } catch (err) {
     console.error('Error al crear solicitud:', err);
-    // Devolver el mensaje real del error para facilitar debugging
     res.status(500).json({ error: err.message || 'Error al crear solicitud' });
   }
 });

@@ -70,7 +70,7 @@ export function useSolicitudes(_profesorId?: number, _isAdmin?: boolean) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ salon_id: Number(salon_id), motivo })
+      body: JSON.stringify({ salon_id: salon_id, motivo })
     })
 
     if (!res.ok) {
