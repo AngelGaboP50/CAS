@@ -38,23 +38,33 @@ router.get('/token', (req, res) => {
 });
 
 // ESP32 consulta el estado cada 2 segundos
-router.get('/status', (req, res) => {
+router.get('/status', async (req, res) => {
   const { salon_id } = req.query;
   if (!salon_id) return res.status(400).json({ error: 'Falta salon_id' });
 
-  const state = global.hardwareState[salon_id];
-  if (!state) {
-    return res.json({ status: 'LOCKED' });
-  }
+  try {
+    // 1. Verificar si hay un comando de apertura forzada temporal en memoria (OPEN)
+    const state = global.hardwareState[salon_id];
+    if (state && state.status === 'OPEN') {
+      // Si estaba abierto temporalmente por un scan, lo regresamos a LOCKED en memoria
+      // y respondemos OPEN para que el ESP32 sepa que acaba de haber un scan exitoso
+      state.status = 'LOCKED';
+      return res.json({ status: 'OPEN' });
+    }
 
-  const currentStatus = state.status;
-  
-  // Si estaba abierto, lo regresamos a LOCKED para que no siga girando el motor
-  if (currentStatus === 'OPEN') {
-    state.status = 'LOCKED';
+    // 2. Si no hay un comando de apertura, consultar el estado real en la base de datos
+    const [rows] = await pool.query('SELECT estado FROM salones WHERE id = ?', [salon_id]);
+    
+    if (rows.length === 0) {
+      return res.json({ status: 'NO_DISPONIBLE' });
+    }
+    
+    // Responder con el estado real de la BD (ej. 'LIBRE', 'EN_CLASE', 'NO_DISPONIBLE')
+    res.json({ status: rows[0].estado });
+  } catch (err) {
+    console.error('Error obteniendo status del hardware:', err);
+    res.status(500).json({ error: 'Error del servidor' });
   }
-
-  res.json({ status: currentStatus });
 });
 
 // Frontend envía el token escaneado
