@@ -9,20 +9,40 @@ function getUsuario() {
   try { return JSON.parse(sessionStorage.getItem('usuario') ?? '') } catch { return null }
 }
 
-// Nombre del salón que se mostrará — en prototipo mapeamos el id al nombre
-async function fetchNombreSalon(salon_id: string): Promise<string> {
+// Busca el salón en la DB por su id o por su nombre/label
+// Retorna { nombre, realId } para usar el ID real de la DB en las solicitudes
+async function fetchSalonInfo(salon_id_o_nombre: string): Promise<{ nombre: string; realId: string }> {
   try {
     const token = sessionStorage.getItem('token')
     const res = await fetch(`${API_URL}/api/salones`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    if (!res.ok) return `Salón ${salon_id}`
+    if (!res.ok) return { nombre: `Salón ${salon_id_o_nombre}`, realId: salon_id_o_nombre }
     const data = await res.json()
-    const salones = Array.isArray(data) ? data : (data.salones ?? [])
-    const salon = salones.find((s: any) => String(s.id) === String(salon_id))
-    return salon?.nombre ?? salon?.label ?? `Salón ${salon_id}`
+    const salones: any[] = Array.isArray(data) ? data : (data.salones ?? [])
+
+    // Buscar primero por id exacto
+    let salon = salones.find((s) => String(s.id) === String(salon_id_o_nombre))
+
+    // Si no encontró por id, buscar por nombre/label que incluya el número
+    // Ej: salon_id_o_nombre='11' debe encontrar { label:'Salón 11', id:1 }
+    if (!salon) {
+      salon = salones.find(
+        (s) =>
+          (s.label && (s.label === salon_id_o_nombre || s.label.endsWith(` ${salon_id_o_nombre}`))) ||
+          (s.nombre && (s.nombre === salon_id_o_nombre || s.nombre.endsWith(` ${salon_id_o_nombre}`)))
+      )
+    }
+
+    if (salon) {
+      return {
+        nombre: salon.nombre ?? salon.label ?? `Salón ${salon_id_o_nombre}`,
+        realId: String(salon.id),
+      }
+    }
+    return { nombre: `Salón ${salon_id_o_nombre}`, realId: salon_id_o_nombre }
   } catch {
-    return `Salón ${salon_id}`
+    return { nombre: `Salón ${salon_id_o_nombre}`, realId: salon_id_o_nombre }
   }
 }
 
@@ -34,13 +54,15 @@ export default function QrAccessPage() {
 
   const token = searchParams.get('token')
 
-  // Fase del flujo: 'loading' | 'no-auth' | 'no-role' | 'welcome' | 'qr-check' | 'granted' | 'requires-request' | 'waiting' | 'denied'
+  // Fase del flujo
   const [fase, setFase] = useState<
     'loading' | 'no-auth' | 'no-role' | 'welcome' | 'qr-check' | 'granted' | 'requires-request' | 'waiting' | 'denied'
   >('loading')
 
   const [mensaje, setMensaje] = useState('')
   const [nombreSalon, setNombreSalon] = useState('')
+  // realSalonId = el id REAL en la base de datos (puede diferir del param de la URL)
+  const [realSalonId, setRealSalonId] = useState<string>('1')
   const [timeLeft, setTimeLeft] = useState(3600)
   const [solicitudId, setSolicitudId] = useState<string | null>(null)
 
@@ -64,9 +86,11 @@ export default function QrAccessPage() {
         return
       }
 
-      // 3. Cargar nombre del salón
-      const nombre = salon_id ? await fetchNombreSalon(salon_id) : 'Salón desconocido'
-      setNombreSalon(nombre)
+      // 3. Cargar nombre e ID real del salón
+      const salonParam = salon_id || '1'
+      const info = await fetchSalonInfo(salonParam)
+      setNombreSalon(info.nombre)
+      setRealSalonId(info.realId)
 
       // 4. Si viene sin token de QR (acceso directo por URL sin escanear), mostrar
       //    el modal de bienvenida/solicitud directamente
@@ -156,8 +180,9 @@ export default function QrAccessPage() {
   const handleEnviarSolicitud = async () => {
     try {
       setFase('loading')
+      // Usar realSalonId (el id de la DB) en vez del parámetro de la URL
       const id = await crearSolicitud(
-        salon_id || '1',
+        realSalonId,
         'Solicitud de acceso al salón desde código QR'
       )
       setSolicitudId(id)
