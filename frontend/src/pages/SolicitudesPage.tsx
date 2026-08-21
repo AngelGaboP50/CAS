@@ -108,19 +108,19 @@ export default function SolicitudesPage() {
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
                     <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '22px' }}>meeting_room</span>
                     <span style={{ fontWeight: 600, fontSize: '16px' }}>
-                      {sol.salon?.nombre ?? sol.salon_id}
+                      {sol.salon_nombre || `Salón ${sol.salon_id}`}
                     </span>
                     {esAdmin && (
                       <span style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
-                        — {sol.profesor?.nombre}
+                        — {sol.profesor_nombre || 'Profesor'}
                       </span>
                     )}
                   </div>
 
                   <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>
-                    <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>calendar_today</span> {formatFecha(sol.fecha)}</span>
-                    <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>schedule</span> {sol.hora_inicio} – {sol.hora_fin}</span>
-                    <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>send</span> Enviada {formatFecha(sol.created_at)}</span>
+                    {sol.fecha && <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>calendar_today</span> {formatFecha(sol.fecha)}</span>}
+                    {sol.hora_inicio && <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>schedule</span> {sol.hora_inicio} – {sol.hora_fin}</span>}
+                    <span><span className="material-symbols-outlined" style={{ fontSize: '15px', verticalAlign: 'middle' }}>send</span> Enviada {sol.created_at ? formatFecha(sol.created_at) : ''}</span>
                   </div>
 
                   <p style={{ marginTop: '10px', fontSize: '14px', color: 'var(--color-on-surface)' }}>

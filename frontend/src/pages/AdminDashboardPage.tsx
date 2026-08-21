@@ -749,9 +749,9 @@ export default function AdminDashboardPage() {
                       <div className="dash-card" key={sol.id} style={{ padding: '20px 24px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                           <div>
-                            <p style={{ fontWeight: 600, marginBottom: '6px' }}>{sol.profesor?.nombre} — {sol.salon?.nombre}</p>
+                            <p style={{ fontWeight: 600, marginBottom: '6px' }}>{sol.profesor_nombre || 'Profesor'} — {sol.salon_nombre || `Salón ${sol.salon_id}`}</p>
                             <p style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)', marginBottom: '4px' }}>
-                              {sol.fecha} · {sol.hora_inicio} – {sol.hora_fin}
+                              {sol.created_at ? formatFecha(sol.created_at) : (sol.fecha || 'Sin fecha')}
                             </p>
                             <p style={{ fontSize: '14px' }}>Motivo: {sol.motivo}</p>
                             {sol.respuesta && <p style={{ fontSize: '13px', fontStyle: 'italic', color: 'var(--color-on-surface-variant)' }}>Respuesta: {sol.respuesta}</p>}

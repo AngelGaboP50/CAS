@@ -86,6 +86,18 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// Obtener estado de una solicitud (para polling)
+router.get('/:id/estado', auth, async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT estado, respuesta FROM solicitudes WHERE id = ?", [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Solicitud no encontrada' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error al obtener estado:', err);
+    res.status(500).json({ error: 'Error al obtener estado' });
+  }
+});
+
 // Actualizar solicitud (Administrador)
 router.put('/:id', auth, async (req, res) => {
   if (req.user.rol !== 2) return res.status(403).json({ error: 'Solo administradores' });
