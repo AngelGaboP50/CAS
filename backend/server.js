@@ -15,12 +15,8 @@ const PORT = process.env.PORT || 3001
 // ─── MIDDLEWARES ──────────────────────────────────────────────────────────────
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir cualquier localhost en desarrollo y red local
-    if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://10.')) {
-      callback(null, true)
-    } else {
-      callback(new Error('No permitido por CORS'))
-    }
+    // Permitir cualquier origen para producción y desarrollo local
+    callback(null, true)
   },
   credentials: true
 }))
