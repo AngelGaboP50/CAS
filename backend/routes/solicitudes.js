@@ -60,17 +60,19 @@ router.get('/:id/estado', auth, async (req, res) => {
 // Crear solicitud (Profesor)
 router.post('/', auth, async (req, res) => {
   const { salon_id, motivo } = req.body;
-  if (!salon_id) return res.status(400).json({ error: 'Faltan campos' });
+  if (!salon_id) return res.status(400).json({ error: 'Falta el campo salon_id' });
+  if (!req.user?.id) return res.status(401).json({ error: 'Token inválido o sin usuario' });
 
   try {
     const [result] = await pool.query(
       "INSERT INTO solicitudes (salon_id, profesor_id, motivo, estado) VALUES (?, ?, ?, 'PENDIENTE')",
-      [salon_id, req.user.id, motivo || 'Fuera de horario']
+      [Number(salon_id), req.user.id, motivo || 'Fuera de horario']
     );
     res.status(201).json({ id: result.insertId, message: 'Solicitud creada' });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al crear solicitud' });
+    console.error('Error al crear solicitud:', err);
+    // Devolver el mensaje real del error para facilitar debugging
+    res.status(500).json({ error: err.message || 'Error al crear solicitud' });
   }
 });
 

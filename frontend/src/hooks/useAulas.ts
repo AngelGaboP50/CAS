@@ -1,7 +1,7 @@
 // src/hooks/useAulas.ts
 // Conectado al backend MySQL con fallback interactivo en modo mock
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 export type EstadoAula = 'LIBRE' | 'EN_CLASE' | 'ALERTA' | 'EXCEPCION' | 'NO_DISPONIBLE'
 
@@ -57,6 +57,11 @@ export function useAulas() {
       setLoading(false)
     }
   }, [])
+
+  // Auto-fetch al montar el hook
+  useEffect(() => {
+    fetchAulas()
+  }, [fetchAulas])
 
   const updateEstadoAula = async (id: string, nuevoEstado: EstadoAula) => {
     const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'

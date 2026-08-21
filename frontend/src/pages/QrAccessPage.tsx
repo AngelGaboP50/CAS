@@ -163,7 +163,9 @@ export default function QrAccessPage() {
       setSolicitudId(id)
       setFase('waiting')
     } catch (e: any) {
-      setMensaje(e.message || 'Error al crear la solicitud. Intenta de nuevo.')
+      // Mostrar el error real del backend
+      const msg = e.message || 'Error al crear la solicitud.'
+      setMensaje(msg)
       setFase('denied')
     }
   }
