@@ -8,14 +8,15 @@ const usuariosRoutes = require('./routes/usuarios')
 const salonesRoutes  = require('./routes/salones')
 const horariosRoutes = require('./routes/horarios')
 const accesosRoutes  = require('./routes/accesos')
+const hardwareRoutes = require('./routes/hardware')
 const app  = express()
 const PORT = process.env.PORT || 3001
 
 // ─── MIDDLEWARES ──────────────────────────────────────────────────────────────
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir cualquier localhost en desarrollo
-    if (!origin || origin.startsWith('http://localhost')) {
+    // Permitir cualquier localhost en desarrollo y red local
+    if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://10.')) {
       callback(null, true)
     } else {
       callback(new Error('No permitido por CORS'))
@@ -34,6 +35,7 @@ app.use('/api/usuarios', usuariosRoutes)
 app.use('/api/salones',  salonesRoutes)
 app.use('/api/horarios', horariosRoutes)
 app.use('/api/accesos',  accesosRoutes)
+app.use('/api/hardware', hardwareRoutes)
 
 // Ruta de salud (para verificar que el backend está corriendo)
 app.get('/api/health', (req, res) => {

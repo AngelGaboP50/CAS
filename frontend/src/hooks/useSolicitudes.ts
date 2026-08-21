@@ -71,7 +71,7 @@ export function useSolicitudes(_profesorId?: number, _soloAdmin = false) {
     adminId: number,
     estado: 'APROBADA' | 'RECHAZADA',
     respuesta: string,
-    _solicitud: Solicitud
+    solicitud: Solicitud
   ) => {
     const updated = solicitudes.map(s => {
       if (s.id === id) {
@@ -87,6 +87,24 @@ export function useSolicitudes(_profesorId?: number, _soloAdmin = false) {
     })
     setSolicitudes(updated)
     sessionStorage.setItem('mock_solicitudes', JSON.stringify(updated))
+
+    // Si fue aprobada, mandar el comando al hardware para abrir la puerta
+    if (estado === 'APROBADA') {
+      try {
+        const token = sessionStorage.getItem('token');
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        await fetch(`${API_URL}/api/hardware/force_open`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ salon_id: solicitud.salon_id })
+        });
+      } catch (err) {
+        console.error('Error al intentar abrir el hardware', err);
+      }
+    }
   }
 
   const cancelarSolicitud = async (id: string) => {
