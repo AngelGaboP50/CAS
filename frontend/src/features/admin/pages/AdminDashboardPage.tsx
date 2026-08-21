@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import '../../../shared/styles/DashboardPage.css' // Reutilizamos los estilos del dashboard normal
 import { InteractiveMap } from '../../salones/components/InteractiveMap'
-import { useAulas, type EstadoAula } from '../../salones/hooks/useAulas'
 import { useNotificaciones } from '../../notificaciones/hooks/useNotificaciones'
+import { useSolicitudes } from '../../../hooks/useSolicitudes'
 
 function AdminDashboardPage() {
   const navigate = useNavigate()
@@ -39,6 +39,9 @@ function AdminDashboardPage() {
   // Estado para el CRUD
   const [isEditing, setIsEditing] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  // Estado para preview de imagen de horario
+  const [previewImg, setPreviewImg] = useState<string | null>(null)
   
   const [formName, setFormName] = useState('')
   const [formEmail, setFormEmail] = useState('')
@@ -49,10 +52,8 @@ function AdminDashboardPage() {
   const adminThemeGlow = 'rgba(255, 77, 79, 0.4)'
   const adminThemeBg = 'rgba(255, 77, 79, 0.15)'
 
-  // Hook para Aulas (Control de Salones)
-  const { aulas, updateEstadoAula } = useAulas()
 
-  // ── Estado para la sección de Solicitudes (Antes Horarios) ─────────────────────────────
+  // ── Estado para la sección de Solicitudes ──────────────────────────────────
   type EstadoHorario = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'todos'
   const [horarioFilter, setHorarioFilter] = useState<EstadoHorario>('PENDIENTE')
   
@@ -85,18 +86,6 @@ function AdminDashboardPage() {
   )
 
   const pendientesCount = solicitudes.filter(s => s.estado === 'PENDIENTE').length
-
-  const handleUpdateEstado = async (id: string, estadoActual: EstadoAula) => {
-    const estadosPermitidos: EstadoAula[] = ['LIBRE', 'EN_CLASE', 'ALERTA', 'EXCEPCION', 'NO_DISPONIBLE'];
-    const currentIndex = estadosPermitidos.indexOf(estadoActual);
-    const nextEstado = estadosPermitidos[(currentIndex + 1) % estadosPermitidos.length];
-    
-    try {
-      await updateEstadoAula(id, nextEstado);
-    } catch (err) {
-      alert('Error al actualizar el estado del salón');
-    }
-  }
 
   useEffect(() => {
     if (!usuario) {
@@ -388,8 +377,8 @@ function AdminDashboardPage() {
                 {/* Filtro de tabs */}
                 <div className="admin-hor-tabs">
                   <button
-                    className={`admin-hor-tab${horarioFilter === 'pendiente' ? ' admin-hor-tab--active' : ''}`}
-                    onClick={() => setHorarioFilter('pendiente')}
+                    className={`admin-hor-tab${horarioFilter === 'PENDIENTE' ? ' admin-hor-tab--active' : ''}`}
+                    onClick={() => setHorarioFilter('PENDIENTE')}
                   >
                     <span className="material-symbols-outlined">pending</span>
                     Pendientes
@@ -398,18 +387,18 @@ function AdminDashboardPage() {
                     )}
                   </button>
                   <button
-                    className={`admin-hor-tab${horarioFilter === 'autorizado' ? ' admin-hor-tab--active' : ''}`}
-                    onClick={() => setHorarioFilter('autorizado')}
+                    className={`admin-hor-tab${horarioFilter === 'APROBADA' ? ' admin-hor-tab--active' : ''}`}
+                    onClick={() => setHorarioFilter('APROBADA')}
                   >
                     <span className="material-symbols-outlined">check_circle</span>
-                    Autorizados
+                    Aprobadas
                   </button>
                   <button
-                    className={`admin-hor-tab${horarioFilter === 'rechazado' ? ' admin-hor-tab--active' : ''}`}
-                    onClick={() => setHorarioFilter('rechazado')}
+                    className={`admin-hor-tab${horarioFilter === 'RECHAZADA' ? ' admin-hor-tab--active' : ''}`}
+                    onClick={() => setHorarioFilter('RECHAZADA')}
                   >
                     <span className="material-symbols-outlined">cancel</span>
-                    Rechazados
+                    Rechazadas
                   </button>
                   <button
                     className={`admin-hor-tab${horarioFilter === 'todos' ? ' admin-hor-tab--active' : ''}`}

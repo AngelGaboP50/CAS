@@ -3,8 +3,27 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSolicitudes } from '../hooks/useSolicitudes'
 import './DashboardPage.css'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
 function getUsuario() {
   try { return JSON.parse(sessionStorage.getItem('usuario') ?? '') } catch { return null }
+}
+
+// Nombre del salón que se mostrará — en prototipo mapeamos el id al nombre
+async function fetchNombreSalon(salon_id: string): Promise<string> {
+  try {
+    const token = sessionStorage.getItem('token')
+    const res = await fetch(`${API_URL}/api/salones`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) return `Salón ${salon_id}`
+    const data = await res.json()
+    const salones = Array.isArray(data) ? data : (data.salones ?? [])
+    const salon = salones.find((s: any) => String(s.id) === String(salon_id))
+    return salon?.nombre ?? salon?.label ?? `Salón ${salon_id}`
+  } catch {
+    return `Salón ${salon_id}`
+  }
 }
 
 export default function QrAccessPage() {
@@ -12,81 +31,87 @@ export default function QrAccessPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const usuario = getUsuario()
-  
+
   const token = searchParams.get('token')
-  const [loading, setLoading] = useState(true)
-  const [estadoSolicitud, setEstadoSolicitud] = useState<string | null>(null) // 'PENDING', 'GRANTED', 'REQUIRES_REQUEST', 'DENIED', 'WAITING_APPROVAL'
-  const [mensaje, setMensaje] = useState<string>('')
-  const [timeLeft, setTimeLeft] = useState(3600) // 1 hora en segundos
+
+  // Fase del flujo: 'loading' | 'no-auth' | 'no-role' | 'welcome' | 'qr-check' | 'granted' | 'requires-request' | 'waiting' | 'denied'
+  const [fase, setFase] = useState<
+    'loading' | 'no-auth' | 'no-role' | 'welcome' | 'qr-check' | 'granted' | 'requires-request' | 'waiting' | 'denied'
+  >('loading')
+
+  const [mensaje, setMensaje] = useState('')
+  const [nombreSalon, setNombreSalon] = useState('')
+  const [timeLeft, setTimeLeft] = useState(3600)
   const [solicitudId, setSolicitudId] = useState<string | null>(null)
-  
+
   const { crearSolicitud, checkEstadoSolicitud } = useSolicitudes()
 
+  // ── Carga inicial ──────────────────────────────────────────────────────────
   useEffect(() => {
-    // 1. Verificar si está logueado
-    if (!usuario) {
-      sessionStorage.setItem('returnUrl', window.location.pathname + window.location.search)
-      navigate('/login')
-      return
-    }
-
-    // 2. Verificar que sea profesor
-    if (usuario.tipo !== 'profesor') {
-      alert('Solo los profesores pueden acceder por este medio.')
-      navigate('/dashboard')
-      return
-    }
-
-    // 3. Validar con el backend el token
-    async function validarQR() {
-      if (!salon_id || !token) {
-        setEstadoSolicitud('DENIED')
-        setMensaje('Código QR inválido. Faltan parámetros.')
-        setLoading(false)
+    async function init() {
+      // 1. Sin sesión → redirigir al login guardando la URL
+      if (!usuario) {
+        sessionStorage.setItem('returnUrl', window.location.pathname + window.location.search)
+        navigate('/login')
         return
       }
 
+      // 2. No es profesor → mostrar pantalla de error limpia (sin alert)
+      const esProfesor =
+        usuario.tipo === 'profesor' || Number(usuario.rol) === 1
+      if (!esProfesor) {
+        setFase('no-role')
+        return
+      }
+
+      // 3. Cargar nombre del salón
+      const nombre = salon_id ? await fetchNombreSalon(salon_id) : 'Salón desconocido'
+      setNombreSalon(nombre)
+
+      // 4. Si viene sin token de QR (acceso directo por URL sin escanear), mostrar
+      //    el modal de bienvenida/solicitud directamente
+      if (!token) {
+        setFase('welcome')
+        return
+      }
+
+      // 5. Validar el token QR con el backend
+      setFase('qr-check')
       try {
         const jwtToken = sessionStorage.getItem('token')
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
         const res = await fetch(`${API_URL}/api/hardware/scan`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${jwtToken}`
+            Authorization: `Bearer ${jwtToken}`
           },
           body: JSON.stringify({ salon_id, token })
         })
-
         const data = await res.json()
 
         if (res.ok) {
           if (data.status === 'GRANTED') {
-            setEstadoSolicitud('GRANTED')
+            setFase('granted')
             setMensaje(data.message)
           } else if (data.status === 'REQUIRES_REQUEST') {
-            setEstadoSolicitud('REQUIRES_REQUEST')
-            setMensaje(data.message)
+            // En vez de pedir solicitud de golpe, mostramos el modal de bienvenida
+            setFase('welcome')
           }
         } else {
-          setEstadoSolicitud('DENIED')
-          setMensaje(data.error || 'Error al validar el QR.')
+          setFase('welcome') // Si falla el QR, mostramos el modal de solicitud igual
         }
-      } catch (error) {
-        console.error(error)
-        setEstadoSolicitud('DENIED')
-        setMensaje('Error de conexión con el servidor.')
-      } finally {
-        setLoading(false)
+      } catch {
+        setFase('welcome')
       }
     }
 
-    validarQR()
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Timer si fue concedido
+  // ── Timer cuando acceso fue concedido ──────────────────────────────────────
   useEffect(() => {
-    if (estadoSolicitud === 'GRANTED') {
+    if (fase === 'granted') {
       const interval = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
@@ -99,61 +124,60 @@ export default function QrAccessPage() {
       }, 1000)
       return () => clearInterval(interval)
     }
-  }, [estadoSolicitud])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase])
 
-  // Polling si está esperando aprobación
+  // ── Polling cuando la solicitud está en espera ─────────────────────────────
   useEffect(() => {
-    let intervalId: number;
-    if (estadoSolicitud === 'WAITING_APPROVAL' && solicitudId) {
+    let intervalId: number
+    if (fase === 'waiting' && solicitudId) {
       intervalId = window.setInterval(async () => {
         try {
           const res = await checkEstadoSolicitud(solicitudId)
           if (res.estado === 'APROBADA') {
-            setEstadoSolicitud('GRANTED')
-            setMensaje('El administrador aprobó tu solicitud. El salón se ha abierto.')
+            setFase('granted')
+            setMensaje('El administrador aprobó tu solicitud. ¡El salón está listo!')
           } else if (res.estado === 'RECHAZADA') {
-            setEstadoSolicitud('DENIED')
-            setMensaje('El administrador rechazó tu solicitud: ' + (res.respuesta || 'Sin motivo.'))
+            setFase('denied')
+            setMensaje(
+              'El administrador rechazó tu solicitud: ' + (res.respuesta || 'Sin motivo especificado.')
+            )
           }
-        } catch (e) {
-          console.error('Error polling', e)
+        } catch {
+          // Silenciar errores de polling
         }
       }, 3000)
     }
     return () => clearInterval(intervalId)
-  }, [estadoSolicitud, solicitudId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fase, solicitudId])
 
-  const handleSolicitarAcceso = async () => {
+  // ── Acciones ───────────────────────────────────────────────────────────────
+  const handleEnviarSolicitud = async () => {
     try {
-      setLoading(true)
-      const id = await crearSolicitud(salon_id || '', 'Olvido de llave / Fuera de horario')
+      setFase('loading')
+      const id = await crearSolicitud(
+        salon_id || '1',
+        'Solicitud de acceso al salón desde código QR'
+      )
       setSolicitudId(id)
-      setEstadoSolicitud('WAITING_APPROVAL')
-      setMensaje('Enviada. Esperando respuesta del administrador...')
+      setFase('waiting')
     } catch (e: any) {
-      alert(e.message || 'Error al crear solicitud')
-    } finally {
-      setLoading(false)
+      setMensaje(e.message || 'Error al crear la solicitud. Intenta de nuevo.')
+      setFase('denied')
     }
   }
 
   const handleCerrarCerradura = async () => {
-    // Cuando el profesor abandona el salón, actualizar el estatus a LIBRE
     try {
       const jwtToken = sessionStorage.getItem('token')
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
       await fetch(`${API_URL}/api/salones/${salon_id}/liberar`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${jwtToken}`
-        }
+        headers: { Authorization: `Bearer ${jwtToken}` }
       })
-    } catch (e) {
-      console.error('Error liberando salón', e)
-    }
-
-    setEstadoSolicitud('DENIED')
-    setMensaje('Tu tiempo ha expirado o has abandonado el salón.')
+    } catch {/* silenciar */}
+    setFase('denied')
+    setMensaje('Has abandonado el salón. El acceso fue cerrado.')
   }
 
   const formatTime = (seconds: number) => {
@@ -163,88 +187,368 @@ export default function QrAccessPage() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
-  if (loading) {
-    return (
-      <div className="dash-root" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }}>qr_code_scanner</span>
-          <p style={{ marginTop: '16px' }}>Cargando...</p>
-        </div>
-      </div>
-    )
-  }
-
+  // ── Renderizado ────────────────────────────────────────────────────────────
   return (
-    <div className="dash-root" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-      <div className="dash-card" style={{ textAlign: 'center', padding: '40px', maxWidth: '400px', width: '100%' }}>
-        
-        {estadoSolicitud === 'WAITING_APPROVAL' && (
-          <>
-            <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }}>hourglass_empty</span>
-            <h2 style={{ marginTop: '20px', color: 'var(--color-primary)' }}>Solicitud Enviada</h2>
-            <p>{mensaje}</p>
-            <p style={{ marginTop: '10px', fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>
-              Por favor, no cierres esta pantalla. Te daremos acceso automáticamente cuando el administrador apruebe la solicitud.
-            </p>
-            <button className="dash-logout-btn" style={{ marginTop: '20px' }} onClick={() => navigate('/dashboard')}>
-              Cancelar y volver al inicio
-            </button>
-          </>
-        )}
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'var(--color-bg, #111319)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 16px',
+        fontFamily: "'Inter', sans-serif",
+        color: 'var(--color-on-surface, #e2e2eb)',
+      }}
+    >
+      {/* ── Cargando ── */}
+      {fase === 'loading' && (
+        <div style={{ textAlign: 'center' }}>
+          <span
+            className="material-symbols-outlined"
+            style={{ fontSize: '52px', color: 'var(--color-primary, #92ccff)', display: 'block', marginBottom: '16px' }}
+          >
+            qr_code_scanner
+          </span>
+          <p style={{ color: 'var(--color-on-surface-variant, #bfc7d2)', fontSize: '15px' }}>
+            Verificando acceso...
+          </p>
+        </div>
+      )}
 
-        {estadoSolicitud === 'GRANTED' && (
-          <>
-            <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-secondary)' }}>meeting_room</span>
-            <h2 style={{ marginTop: '20px', color: 'var(--color-secondary)' }}>¡Acceso Concedido!</h2>
-            <p>{mensaje}</p>
+      {/* ── No tiene el rol correcto ── */}
+      {fase === 'no-role' && (
+        <Card>
+          <IconCircle color="#fbbf24" icon="warning" />
+          <h2 style={{ margin: '16px 0 8px', color: '#fbbf24', fontSize: '20px' }}>
+            Acceso exclusivo para profesores
+          </h2>
+          <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px', marginBottom: '24px' }}>
+            Tu cuenta no tiene el rol de profesor. Por favor inicia sesión con las credenciales correctas.
+          </p>
+          <ActionBtn
+            onClick={() => {
+              sessionStorage.removeItem('token')
+              sessionStorage.removeItem('usuario')
+              navigate('/login')
+            }}
+            color="var(--color-primary)"
+          >
+            Iniciar sesión como profesor
+          </ActionBtn>
+        </Card>
+      )}
 
-            <div style={{ margin: '40px 0', fontSize: '36px', fontWeight: 'bold' }}>
-              {formatTime(timeLeft)}
+      {/* ── Modal bienvenida: elegir entre ir al dashboard o solicitar ── */}
+      {fase === 'welcome' && (
+        <Card>
+          <IconCircle color="var(--color-primary, #92ccff)" icon="meeting_room" />
+
+          <div style={{ marginTop: '16px', marginBottom: '6px' }}>
+            <span
+              style={{
+                background: 'rgba(146,204,255,0.12)',
+                color: 'var(--color-primary)',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                padding: '4px 12px',
+                borderRadius: '20px',
+              }}
+            >
+              Código QR detectado
+            </span>
+          </div>
+
+          <h2 style={{ margin: '12px 0 4px', fontSize: '22px', fontWeight: 700 }}>
+            ¡Hola, {usuario?.nombre ?? 'Profesor'}!
+          </h2>
+          <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px', marginBottom: '4px' }}>
+            Estás tratando de solicitar el salón:
+          </p>
+          <div
+            style={{
+              background: 'rgba(146,204,255,0.08)',
+              border: '1px solid rgba(146,204,255,0.25)',
+              borderRadius: '10px',
+              padding: '14px 20px',
+              margin: '8px 0 24px',
+              textAlign: 'center',
+            }}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: '28px', color: 'var(--color-primary)', display: 'block', marginBottom: '4px' }}
+            >
+              door_front
+            </span>
+            <strong style={{ fontSize: '20px', color: 'var(--color-primary)' }}>{nombreSalon}</strong>
+          </div>
+
+          <p style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)', marginBottom: '20px' }}>
+            ¿Qué deseas hacer?
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+            <ActionBtn onClick={handleEnviarSolicitud} color="var(--color-primary)">
+              <span className="material-symbols-outlined" style={{ fontSize: '18px', verticalAlign: 'middle', marginRight: '6px' }}>
+                send
+              </span>
+              Enviar solicitud al administrador
+            </ActionBtn>
+
+            <ActionBtn onClick={() => navigate('/dashboard')} color="transparent" outline>
+              <span className="material-symbols-outlined" style={{ fontSize: '18px', verticalAlign: 'middle', marginRight: '6px' }}>
+                dashboard
+              </span>
+              Ir al Dashboard
+            </ActionBtn>
+          </div>
+        </Card>
+      )}
+
+      {/* ── Validando QR ── */}
+      {fase === 'qr-check' && (
+        <div style={{ textAlign: 'center' }}>
+          <span
+            className="material-symbols-outlined"
+            style={{ fontSize: '52px', color: 'var(--color-secondary, #4ae183)', display: 'block', marginBottom: '16px' }}
+          >
+            lock_open
+          </span>
+          <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '15px' }}>
+            Validando tu código QR...
+          </p>
+        </div>
+      )}
+
+      {/* ── Acceso concedido ── */}
+      {fase === 'granted' && (
+        <Card>
+          <IconCircle color="var(--color-secondary, #4ae183)" icon="check_circle" />
+          <h2 style={{ margin: '16px 0 8px', color: 'var(--color-secondary)', fontSize: '22px' }}>
+            ¡Acceso Concedido!
+          </h2>
+          <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px', marginBottom: '6px' }}>
+            {mensaje || 'Bienvenido al salón.'}
+          </p>
+          <p style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)', marginBottom: '20px' }}>
+            {nombreSalon}
+          </p>
+
+          <div
+            style={{
+              fontSize: '40px',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              color: 'var(--color-secondary)',
+              margin: '16px 0 24px',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {formatTime(timeLeft)}
+          </div>
+
+          <ActionBtn onClick={handleCerrarCerradura} color="#ff6b7a">
+            <span className="material-symbols-outlined" style={{ fontSize: '18px', verticalAlign: 'middle', marginRight: '6px' }}>
+              exit_to_app
+            </span>
+            Abandonar Salón
+          </ActionBtn>
+        </Card>
+      )}
+
+      {/* ── Esperando aprobación ── */}
+      {fase === 'waiting' && (
+        <Card>
+          <IconCircle color="#fbbf24" icon="hourglass_empty" pulse />
+          <h2 style={{ margin: '16px 0 8px', color: '#fbbf24', fontSize: '22px' }}>
+            Solicitud Enviada
+          </h2>
+          <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px', marginBottom: '8px' }}>
+            Tu solicitud para <strong style={{ color: 'var(--color-on-surface)' }}>{nombreSalon}</strong> fue enviada al administrador.
+          </p>
+
+          {/* Estado visible */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              background: 'rgba(251,191,36,0.08)',
+              border: '1px solid rgba(251,191,36,0.3)',
+              borderRadius: '10px',
+              padding: '12px 16px',
+              margin: '12px 0 20px',
+              width: '100%',
+              boxSizing: 'border-box',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ color: '#fbbf24', fontSize: '22px' }}>
+              pending
+            </span>
+            <div>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '14px', color: '#fbbf24' }}>
+                Estado: EN ESPERA
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--color-on-surface-variant)' }}>
+                Verificando cada 3 segundos...
+              </p>
             </div>
+            <div
+              style={{
+                marginLeft: 'auto',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: '#fbbf24',
+                animation: 'blink 1.5s ease-in-out infinite',
+              }}
+            />
+          </div>
 
-            <button onClick={handleCerrarCerradura} style={{ 
-              background: '#ff6b7a', color: 'white', padding: '12px 24px', 
-              borderRadius: '8px', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', width: '100%' 
-            }}>
-              <span className="material-symbols-outlined" style={{ verticalAlign: 'middle', marginRight: '8px' }}>exit_to_app</span> 
-              Abandonar Salón
-            </button>
-          </>
-        )}
+          <p style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)', marginBottom: '20px', textAlign: 'center' }}>
+            No cierres esta pantalla. Se te notificará automáticamente cuando el administrador responda.
+          </p>
 
-        {estadoSolicitud === 'REQUIRES_REQUEST' && (
-          <>
-            <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#fbbf24' }}>schedule</span>
-            <h2 style={{ marginTop: '20px', color: '#fbbf24' }}>Fuera de Horario</h2>
-            <p>{mensaje}</p>
-            <p style={{ marginTop: '10px', fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>
-              Si necesitas entrar a este salón, debes solicitar permiso a un administrador.
-            </p>
+          <ActionBtn onClick={() => navigate('/dashboard')} color="transparent" outline>
+            Cancelar y volver al inicio
+          </ActionBtn>
+        </Card>
+      )}
 
-            <button onClick={handleSolicitarAcceso} style={{ 
-              background: 'var(--color-primary)', color: 'white', padding: '12px 24px', marginTop: '20px',
-              borderRadius: '8px', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', width: '100%' 
-            }}>
-              <span className="material-symbols-outlined" style={{ verticalAlign: 'middle', marginRight: '8px' }}>send</span> 
-              Solicitar Acceso al Admin
-            </button>
-            <button className="dash-logout-btn" style={{ marginTop: '10px' }} onClick={() => navigate('/dashboard')}>
-              Cancelar
-            </button>
-          </>
-        )}
+      {/* ── Acceso denegado / rechazado ── */}
+      {fase === 'denied' && (
+        <Card>
+          <IconCircle color="#ff6b7a" icon="cancel" />
+          <h2 style={{ margin: '16px 0 8px', color: '#ff6b7a', fontSize: '22px' }}>
+            Acceso Denegado
+          </h2>
+          <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '14px', marginBottom: '24px' }}>
+            {mensaje || 'No tienes acceso a este salón en este momento.'}
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+            <ActionBtn onClick={() => navigate('/dashboard')} color="var(--color-primary)">
+              Volver al Dashboard
+            </ActionBtn>
+            <ActionBtn onClick={() => { setFase('welcome'); setMensaje('') }} color="transparent" outline>
+              Intentar de nuevo
+            </ActionBtn>
+          </div>
+        </Card>
+      )}
 
-        {estadoSolicitud === 'DENIED' && (
-          <>
-            <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#ff6b7a' }}>cancel</span>
-            <h2 style={{ marginTop: '20px', color: '#ff6b7a' }}>Acceso denegado</h2>
-            <p>{mensaje}</p>
-            <button className="dash-logout-btn" style={{ marginTop: '20px' }} onClick={() => navigate('/dashboard')}>
-              Volver al inicio
-            </button>
-          </>
-        )}
-      </div>
+      {/* Keyframe para el blink del dot */}
+      <style>{`
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.25; }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
+  )
+}
+
+// ── Componentes auxiliares ─────────────────────────────────────────────────
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        background: 'rgba(30,31,38,0.9)',
+        backdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: '16px',
+        padding: '36px 28px',
+        maxWidth: '400px',
+        width: '100%',
+        textAlign: 'center',
+        boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function IconCircle({
+  color,
+  icon,
+  pulse = false,
+}: {
+  color: string
+  icon: string
+  pulse?: boolean
+}) {
+  return (
+    <div
+      style={{
+        width: '72px',
+        height: '72px',
+        borderRadius: '50%',
+        background: `${color}18`,
+        border: `2px solid ${color}44`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: '0 auto',
+      }}
+    >
+      <span
+        className="material-symbols-outlined"
+        style={{
+          fontSize: '36px',
+          color,
+          ...(pulse ? { animation: 'blink 1.5s ease-in-out infinite' } : {}),
+        }}
+      >
+        {icon}
+      </span>
+    </div>
+  )
+}
+
+function ActionBtn({
+  children,
+  onClick,
+  color,
+  outline = false,
+}: {
+  children: React.ReactNode
+  onClick: () => void
+  color: string
+  outline?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%',
+        padding: '14px 20px',
+        borderRadius: '10px',
+        border: outline ? `1px solid rgba(146,204,255,0.25)` : 'none',
+        background: outline ? 'transparent' : color,
+        color: outline ? 'var(--color-on-surface-variant)' : (color === 'transparent' ? 'var(--color-on-surface-variant)' : '#fff'),
+        fontFamily: "'Inter', sans-serif",
+        fontSize: '14px',
+        fontWeight: 600,
+        cursor: 'pointer',
+        transition: 'opacity 0.2s, transform 0.1s',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+      }}
+      onMouseOver={(e) => (e.currentTarget.style.opacity = '0.85')}
+      onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+      onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.98)')}
+      onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+    >
+      {children}
+    </button>
   )
 }

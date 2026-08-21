@@ -70,7 +70,9 @@ export default function SimulacionPuertaPage() {
     setSolicitudActiva(null)
   }
 
-  const urlQr = `${window.location.origin}/salones?solicitar=${salonIdReal || 'demo'}`
+  // URL que escanea el profesor — apunta a la página de acceso QR con el salon_id
+  const efectiveSalonId = salonIdReal && salonIdReal !== 'demo_id' ? salonIdReal : '1'
+  const urlQr = `${window.location.origin}/qr-access/${efectiveSalonId}`
 
   return (
     <div className="dash-root" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
