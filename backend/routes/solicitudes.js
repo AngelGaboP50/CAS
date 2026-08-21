@@ -111,15 +111,25 @@ router.put('/:id', auth, async (req, res) => {
       [estado, respuesta || '', req.user.id, req.params.id]
     );
 
-    // 2. Si es aprobada, actualizar el salón a OCUPADO (y el ESP32 lo abrirá en su polling de /status)
+    // 2. Si es aprobada, activar la señal OPEN en memoria para que el ESP32 la detecte
     if (estado === 'APROBADA') {
       const [solRows] = await pool.query("SELECT salon_id FROM solicitudes WHERE id = ?", [req.params.id]);
       if (solRows.length > 0) {
-        // Marcamos temporalmente en OPEN para que el ESP32 lo pesque (el polling lo regresa a ocupado o podemos añadir force_open logic)
-        // Wait, currently backend hardware.js /status sends "OPEN" if status is "OPEN" or "OCUPADO" ? 
-        // In hardware.js, GET /status sets status to 'OCUPADO' after it sends 'OPEN'.
-        // So we just need to set it to 'OPEN' here!
-        await pool.query("UPDATE salones SET status = 'OPEN' WHERE id = ?", [solRows[0].salon_id]);
+        const salonId = solRows[0].salon_id;
+
+        // Asegurarse de que global.hardwareState existe
+        if (!global.hardwareState) global.hardwareState = {};
+
+        if (!global.hardwareState[salonId]) {
+          global.hardwareState[salonId] = { status: 'OPEN', token: '', lastScannedBy: req.user.id };
+        } else {
+          // Poner en OPEN: el ESP32 lo leerá en su próximo poll de /status (cada 2 seg)
+          // hardware.js lo regresará a LOCKED automáticamente después de enviarlo
+          global.hardwareState[salonId].status = 'OPEN';
+          global.hardwareState[salonId].lastScannedBy = req.user.id;
+        }
+
+        console.log(`✅ Solicitud aprobada → OPEN enviado al ESP32 para salón ${salonId}`);
       }
     }
 
