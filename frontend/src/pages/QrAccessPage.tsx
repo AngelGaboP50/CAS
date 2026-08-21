@@ -15,11 +15,12 @@ export default function QrAccessPage() {
   
   const token = searchParams.get('token')
   const [loading, setLoading] = useState(true)
-  const [estadoSolicitud, setEstadoSolicitud] = useState<string | null>(null) // 'PENDING', 'GRANTED', 'REQUIRES_REQUEST', 'DENIED'
+  const [estadoSolicitud, setEstadoSolicitud] = useState<string | null>(null) // 'PENDING', 'GRANTED', 'REQUIRES_REQUEST', 'DENIED', 'WAITING_APPROVAL'
   const [mensaje, setMensaje] = useState<string>('')
   const [timeLeft, setTimeLeft] = useState(3600) // 1 hora en segundos
+  const [solicitudId, setSolicitudId] = useState<string | null>(null)
   
-  const { crearSolicitud } = useSolicitudes()
+  const { crearSolicitud, checkEstadoSolicitud } = useSolicitudes()
 
   useEffect(() => {
     // 1. Verificar si está logueado
@@ -100,23 +101,59 @@ export default function QrAccessPage() {
     }
   }, [estadoSolicitud])
 
+  // Polling si está esperando aprobación
+  useEffect(() => {
+    let intervalId: number;
+    if (estadoSolicitud === 'WAITING_APPROVAL' && solicitudId) {
+      intervalId = window.setInterval(async () => {
+        try {
+          const res = await checkEstadoSolicitud(solicitudId)
+          if (res.estado === 'APROBADA') {
+            setEstadoSolicitud('GRANTED')
+            setMensaje('El administrador aprobó tu solicitud. El salón se ha abierto.')
+          } else if (res.estado === 'RECHAZADA') {
+            setEstadoSolicitud('DENIED')
+            setMensaje('El administrador rechazó tu solicitud: ' + (res.respuesta || 'Sin motivo.'))
+          }
+        } catch (e) {
+          console.error('Error polling', e)
+        }
+      }, 3000)
+    }
+    return () => clearInterval(intervalId)
+  }, [estadoSolicitud, solicitudId])
+
   const handleSolicitarAcceso = async () => {
     try {
       setLoading(true)
-      // Lógica existente para crear una solicitud manual
-      await crearSolicitud(salon_id || '', 'Olvido de llave / Fuera de horario')
-      alert('Solicitud enviada al Administrador.')
-      navigate('/solicitudes')
+      const id = await crearSolicitud(salon_id || '', 'Olvido de llave / Fuera de horario')
+      setSolicitudId(id)
+      setEstadoSolicitud('WAITING_APPROVAL')
+      setMensaje('Enviada. Esperando respuesta del administrador...')
     } catch (e: any) {
       alert(e.message || 'Error al crear solicitud')
+    } finally {
       setLoading(false)
     }
   }
 
   const handleCerrarCerradura = async () => {
-    // Aquí podrías hacer otra llamada a la API para cerrar formalmente el salón
+    // Cuando el profesor abandona el salón, actualizar el estatus a LIBRE
+    try {
+      const jwtToken = sessionStorage.getItem('token')
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      await fetch(`${API_URL}/api/salones/${salon_id}/liberar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${jwtToken}`
+        }
+      })
+    } catch (e) {
+      console.error('Error liberando salón', e)
+    }
+
     setEstadoSolicitud('DENIED')
-    setMensaje('Tu tiempo ha expirado o has cerrado la sesión del salón.')
+    setMensaje('Tu tiempo ha expirado o has abandonado el salón.')
   }
 
   const formatTime = (seconds: number) => {
@@ -131,7 +168,7 @@ export default function QrAccessPage() {
       <div className="dash-root" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <div style={{ textAlign: 'center' }}>
           <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }}>qr_code_scanner</span>
-          <p style={{ marginTop: '16px' }}>Validando código QR...</p>
+          <p style={{ marginTop: '16px' }}>Cargando...</p>
         </div>
       </div>
     )
@@ -141,6 +178,20 @@ export default function QrAccessPage() {
     <div className="dash-root" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
       <div className="dash-card" style={{ textAlign: 'center', padding: '40px', maxWidth: '400px', width: '100%' }}>
         
+        {estadoSolicitud === 'WAITING_APPROVAL' && (
+          <>
+            <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }}>hourglass_empty</span>
+            <h2 style={{ marginTop: '20px', color: 'var(--color-primary)' }}>Solicitud Enviada</h2>
+            <p>{mensaje}</p>
+            <p style={{ marginTop: '10px', fontSize: '14px', color: 'var(--color-on-surface-variant)' }}>
+              Por favor, no cierres esta pantalla. Te daremos acceso automáticamente cuando el administrador apruebe la solicitud.
+            </p>
+            <button className="dash-logout-btn" style={{ marginTop: '20px' }} onClick={() => navigate('/dashboard')}>
+              Cancelar y volver al inicio
+            </button>
+          </>
+        )}
+
         {estadoSolicitud === 'GRANTED' && (
           <>
             <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--color-secondary)' }}>meeting_room</span>
@@ -155,8 +206,8 @@ export default function QrAccessPage() {
               background: '#ff6b7a', color: 'white', padding: '12px 24px', 
               borderRadius: '8px', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', width: '100%' 
             }}>
-              <span className="material-symbols-outlined" style={{ verticalAlign: 'middle', marginRight: '8px' }}>lock</span> 
-              Finalizar Clase
+              <span className="material-symbols-outlined" style={{ verticalAlign: 'middle', marginRight: '8px' }}>exit_to_app</span> 
+              Abandonar Salón
             </button>
           </>
         )}

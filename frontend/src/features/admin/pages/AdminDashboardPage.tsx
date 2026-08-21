@@ -52,61 +52,39 @@ function AdminDashboardPage() {
   // Hook para Aulas (Control de Salones)
   const { aulas, updateEstadoAula } = useAulas()
 
-  // ── Estado para la sección de Horarios ─────────────────────────────
-  type EstadoHorario = 'pendiente' | 'autorizado' | 'rechazado'
-  const [horarioFilter, setHorarioFilter] = useState<EstadoHorario | 'todos'>('pendiente')
-  const [previewImg, setPreviewImg] = useState<string | null>(null)
-  const [horariosData, setHorariosData] = useState<Array<{
-    id: string
-    profesorNombre: string
-    profesorCorreo: string
-    imagenUrl: string
-    estado: EstadoHorario
-    fecha: string
-  }>>([
-    {
-      id: '1',
-      profesorNombre: 'Ana López',
-      profesorCorreo: 'ana.lopez@ejemplo.edu.mx',
-      imagenUrl: 'https://placehold.co/400x300/1e1f26/92ccff?text=Horario+Ana',
-      estado: 'pendiente',
-      fecha: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    },
-    {
-      id: '2',
-      profesorNombre: 'Carlos Mendoza',
-      profesorCorreo: 'c.mendoza@ejemplo.edu.mx',
-      imagenUrl: 'https://placehold.co/400x300/1e1f26/92ccff?text=Horario+Carlos',
-      estado: 'pendiente',
-      fecha: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    },
-    {
-      id: '3',
-      profesorNombre: 'Marta Ramírez',
-      profesorCorreo: 'm.ramirez@ejemplo.edu.mx',
-      imagenUrl: 'https://placehold.co/400x300/1e1f26/4ae183?text=Horario+Marta',
-      estado: 'autorizado',
-      fecha: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    },
-  ])
+  // ── Estado para la sección de Solicitudes (Antes Horarios) ─────────────────────────────
+  type EstadoHorario = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'todos'
+  const [horarioFilter, setHorarioFilter] = useState<EstadoHorario>('PENDIENTE')
+  
+  const { solicitudes, fetchSolicitudes, responderSolicitud } = useSolicitudes()
 
-  const handleAutorizarHorario = (id: string) => {
-    setHorariosData(prev =>
-      prev.map(h => h.id === id ? { ...h, estado: 'autorizado' as EstadoHorario } : h)
-    )
+  useEffect(() => {
+    if (activeTab === 'horarios') {
+      fetchSolicitudes()
+    }
+  }, [activeTab, fetchSolicitudes])
+
+  const handleAutorizarHorario = async (id: string, solicitud: any) => {
+    try {
+      await responderSolicitud(id, 'APROBADA', 'Acceso concedido', solicitud)
+    } catch (e: any) {
+      alert(e.message)
+    }
   }
 
-  const handleRechazarHorario = (id: string) => {
-    setHorariosData(prev =>
-      prev.map(h => h.id === id ? { ...h, estado: 'rechazado' as EstadoHorario } : h)
-    )
+  const handleRechazarHorario = async (id: string, solicitud: any) => {
+    try {
+      await responderSolicitud(id, 'RECHAZADA', 'Acceso denegado', solicitud)
+    } catch (e: any) {
+      alert(e.message)
+    }
   }
 
-  const horariosFiltrados = horariosData.filter(h =>
-    horarioFilter === 'todos' ? true : h.estado === horarioFilter
+  const horariosFiltrados = solicitudes.filter(s =>
+    horarioFilter === 'todos' ? true : s.estado === horarioFilter
   )
 
-  const pendientesCount = horariosData.filter(h => h.estado === 'pendiente').length
+  const pendientesCount = solicitudes.filter(s => s.estado === 'PENDIENTE').length
 
   const handleUpdateEstado = async (id: string, estadoActual: EstadoAula) => {
     const estadosPermitidos: EstadoAula[] = ['LIBRE', 'EN_CLASE', 'ALERTA', 'EXCEPCION', 'NO_DISPONIBLE'];
@@ -451,72 +429,56 @@ function AdminDashboardPage() {
                 ) : (
                   <div className="admin-horarios-list">
                     {horariosFiltrados.map(h => (
-                      <div key={h.id} className="admin-horario-card">
-                        {/* Miniatura */}
-                        <img
-                          src={h.imagenUrl}
-                          alt={`Horario de ${h.profesorNombre}`}
-                          className="admin-horario-thumb"
-                          onClick={() => setPreviewImg(h.imagenUrl)}
-                          title="Clic para ampliar"
-                        />
+                      <div key={h.id} className="admin-horario-card" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        {/* Icono */}
+                        <div style={{ background: 'var(--color-surface-container-high)', padding: '16px', borderRadius: '12px', display: 'flex' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '32px', color: 'var(--color-primary)' }}>key</span>
+                        </div>
 
                         {/* Info del profesor */}
-                        <div className="admin-horario-info">
-                          <p className="admin-horario-name">{h.profesorNombre}</p>
+                        <div className="admin-horario-info" style={{ flex: 1 }}>
+                          <p className="admin-horario-name">{h.profesor_nombre} <span style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)' }}>(Salón {h.salon_nombre})</span></p>
                           <p className="admin-horario-meta">
-                            {h.profesorCorreo} &nbsp;·&nbsp;
-                            {new Date(h.fecha).toLocaleString('es-MX', {
+                            {h.profesor_correo} &nbsp;·&nbsp;
+                            {new Date(h.created_at).toLocaleString('es-MX', {
                               day: 'numeric', month: 'short',
                               hour: '2-digit', minute: '2-digit'
                             })}
                           </p>
+                          <p className="admin-horario-meta" style={{ marginTop: '4px', color: 'var(--color-on-surface)' }}>
+                            <strong>Motivo:</strong> {h.motivo}
+                          </p>
                           <div style={{ marginTop: '8px' }}>
-                            <span className={`admin-status-chip admin-status-chip--${h.estado}`}>
-                              {h.estado === 'pendiente' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>pending</span>}
-                              {h.estado === 'autorizado' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>check_circle</span>}
-                              {h.estado === 'rechazado' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>cancel</span>}
-                              {h.estado.charAt(0).toUpperCase() + h.estado.slice(1)}
+                            <span className={`admin-status-chip admin-status-chip--${h.estado.toLowerCase()}`}>
+                              {h.estado === 'PENDIENTE' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>pending</span>}
+                              {h.estado === 'APROBADA' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>check_circle</span>}
+                              {h.estado === 'RECHAZADA' && <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>cancel</span>}
+                              {h.estado}
                             </span>
                           </div>
                         </div>
 
                         {/* Acciones */}
                         <div className="admin-horario-actions">
-                          {h.estado === 'pendiente' && (
+                          {h.estado === 'PENDIENTE' && (
                             <>
                               <button
                                 className="admin-btn-authorize"
-                                onClick={() => handleAutorizarHorario(h.id)}
-                                title="Autorizar horario"
+                                onClick={() => handleAutorizarHorario(h.id, h)}
+                                title="Aprobar acceso"
                               >
                                 <span className="material-symbols-outlined">check_circle</span>
-                                Autorizar
+                                Aprobar
                               </button>
                               <button
                                 className="admin-btn-reject"
-                                onClick={() => handleRechazarHorario(h.id)}
-                                title="Rechazar horario"
+                                onClick={() => handleRechazarHorario(h.id, h)}
+                                title="Rechazar acceso"
                               >
                                 <span className="material-symbols-outlined">cancel</span>
                                 Rechazar
                               </button>
                             </>
-                          )}
-                          {h.estado !== 'pendiente' && (
-                            <button
-                              className="admin-btn-authorize"
-                              style={{
-                                background: 'transparent',
-                                border: '1px solid var(--color-outline-variant)',
-                                color: 'var(--color-on-surface-variant)'
-                              }}
-                              onClick={() => setPreviewImg(h.imagenUrl)}
-                              title="Ver horario"
-                            >
-                              <span className="material-symbols-outlined">visibility</span>
-                              Ver
-                            </button>
                           )}
                         </div>
                       </div>

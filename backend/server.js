@@ -9,6 +9,7 @@ const salonesRoutes  = require('./routes/salones')
 const horariosRoutes = require('./routes/horarios')
 const accesosRoutes  = require('./routes/accesos')
 const hardwareRoutes = require('./routes/hardware')
+const solicitudesRoutes = require('./routes/solicitudes')
 const app  = express()
 const PORT = process.env.PORT || 3001
 
@@ -32,6 +33,7 @@ app.use('/api/salones',  salonesRoutes)
 app.use('/api/horarios', horariosRoutes)
 app.use('/api/accesos',  accesosRoutes)
 app.use('/api/hardware', hardwareRoutes)
+app.use('/api/solicitudes', solicitudesRoutes)
 
 // Ruta de salud (para verificar que el backend está corriendo)
 app.get('/api/health', (req, res) => {

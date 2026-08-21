@@ -62,4 +62,15 @@ router.delete('/:id', async (req, res) => {
   }
 })
 
+// Liberar el salón
+router.post('/:id/liberar', async (req, res) => {
+  try {
+    await pool.query("UPDATE salones SET status = 'LIBRE' WHERE id = ?", [req.params.id])
+    res.json({ message: 'Salón liberado exitosamente' })
+  } catch (err) {
+    console.error('Error al liberar el salón:', err)
+    res.status(500).json({ error: 'Error al liberar el salón' })
+  }
+})
+
 module.exports = router

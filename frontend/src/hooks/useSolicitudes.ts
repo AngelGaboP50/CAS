@@ -1,6 +1,3 @@
-// src/hooks/useSolicitudes.ts
-// Frontend Mock Mode
-
 import { useState, useCallback } from 'react'
 
 export type EstadoSolicitud = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA'
@@ -9,90 +6,89 @@ export interface Solicitud {
   id: string
   profesor_id: number
   salon_id: string
-  fecha: string
-  hora_inicio: string
-  hora_fin: string
+  fecha?: string
+  hora_inicio?: string
+  hora_fin?: string
   motivo: string
   estado: EstadoSolicitud
   admin_id: number | null
   respuesta: string | null
   created_at: string
   updated_at: string
-  salon?: { nombre: string }
-  profesor?: { nombre: string; correo: string }
+  salon_nombre?: string
+  profesor_nombre?: string
+  profesor_correo?: string
 }
 
 export interface NuevaSolicitud {
   salon_id: string
-  fecha: string
-  hora_inicio: string
-  hora_fin: string
   motivo: string
 }
 
-const INITIAL_SOLICITUDES: Solicitud[] = []
+export function useSolicitudes() {
+  const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-export function useSolicitudes(_profesorId?: number, _soloAdmin = false) {
-  const [solicitudes, setSolicitudes] = useState<Solicitud[]>(() => {
-    const local = sessionStorage.getItem('mock_solicitudes')
-    return local ? JSON.parse(local) : INITIAL_SOLICITUDES
-  })
-  const [loading] = useState(false)
-  const [error] = useState<string | null>(null)
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
   const fetchSolicitudes = useCallback(async () => {
-    // No-op en modo mock
-  }, [])
-
-  const crearSolicitud = async (datos: NuevaSolicitud, profesor: { id: number; nombre: string; correo?: string }) => {
-    const nueva: Solicitud = {
-      id: `sol-${Date.now()}`,
-      profesor_id: profesor.id,
-      salon_id: datos.salon_id,
-      fecha: datos.fecha,
-      hora_inicio: datos.hora_inicio,
-      hora_fin: datos.hora_fin,
-      motivo: datos.motivo,
-      estado: 'PENDIENTE',
-      admin_id: null,
-      respuesta: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      salon: { nombre: `Salón ${datos.salon_id}` },
-      profesor: { nombre: profesor.nombre, correo: profesor.correo || 'profesor@uteq.edu.mx' }
+    setLoading(true)
+    setError(null)
+    try {
+      const token = sessionStorage.getItem('token')
+      const res = await fetch(`${API_URL}/api/solicitudes`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) throw new Error('Error al obtener solicitudes')
+      const data = await res.json()
+      setSolicitudes(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-    const updated = [nueva, ...solicitudes]
-    setSolicitudes(updated)
-    sessionStorage.setItem('mock_solicitudes', JSON.stringify(updated))
+  }, [API_URL])
+
+  const crearSolicitud = async (salon_id: string, motivo: string) => {
+    const token = sessionStorage.getItem('token')
+    const res = await fetch(`${API_URL}/api/solicitudes`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ salon_id, motivo })
+    })
+    if (!res.ok) throw new Error('Error al crear solicitud')
+    const data = await res.json()
+    await fetchSolicitudes()
+    return data.id
   }
 
   const responderSolicitud = async (
     id: string,
-    adminId: number,
     estado: 'APROBADA' | 'RECHAZADA',
     respuesta: string,
     solicitud: Solicitud
   ) => {
-    const updated = solicitudes.map(s => {
-      if (s.id === id) {
-        return {
-          ...s,
-          estado,
-          admin_id: adminId,
-          respuesta,
-          updated_at: new Date().toISOString()
-        }
-      }
-      return s
+    const token = sessionStorage.getItem('token')
+    const res = await fetch(`${API_URL}/api/solicitudes/${id}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ estado, respuesta })
     })
-    setSolicitudes(updated)
-    sessionStorage.setItem('mock_solicitudes', JSON.stringify(updated))
+    
+    if (!res.ok) throw new Error('Error al responder solicitud')
+    
+    await fetchSolicitudes()
 
-    // Si fue aprobada, mandar el comando al hardware para abrir la puerta
+    // Si fue aprobada, el hardware se abre
     if (estado === 'APROBADA') {
       try {
-        const token = sessionStorage.getItem('token');
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
         await fetch(`${API_URL}/api/hardware/force_open`, {
           method: 'POST',
           headers: {
@@ -107,19 +103,13 @@ export function useSolicitudes(_profesorId?: number, _soloAdmin = false) {
     }
   }
 
-  const cancelarSolicitud = async (id: string) => {
-    const updated = solicitudes.map(s => {
-      if (s.id === id) {
-        return {
-          ...s,
-          estado: 'CANCELADA' as const,
-          updated_at: new Date().toISOString()
-        }
-      }
-      return s
+  const checkEstadoSolicitud = async (id: string) => {
+    const token = sessionStorage.getItem('token')
+    const res = await fetch(`${API_URL}/api/solicitudes/${id}/estado`, {
+      headers: { Authorization: `Bearer ${token}` }
     })
-    setSolicitudes(updated)
-    sessionStorage.setItem('mock_solicitudes', JSON.stringify(updated))
+    if (!res.ok) throw new Error('No se pudo verificar el estado')
+    return res.json() // { estado, respuesta }
   }
 
   return {
@@ -129,6 +119,6 @@ export function useSolicitudes(_profesorId?: number, _soloAdmin = false) {
     fetchSolicitudes,
     crearSolicitud,
     responderSolicitud,
-    cancelarSolicitud,
+    checkEstadoSolicitud
   }
 }
